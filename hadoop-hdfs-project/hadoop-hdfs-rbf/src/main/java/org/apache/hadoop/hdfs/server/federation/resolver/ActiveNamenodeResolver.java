@@ -146,4 +146,13 @@ public interface ActiveNamenodeResolver {
    * @param routerId Unique string identifier for the router.
    */
   void setRouterId(String routerId);
+
+  /**
+   * Rotate cache, make the current namenode have the lowest priority,
+   * to ensure that the current namenode will not be accessed first next time.
+   *
+   * @param nsId name service id
+   * @param namenode namenode contexts
+   */
+  void rotateCache(String nsId, FederationNamenodeContext namenode);
 }

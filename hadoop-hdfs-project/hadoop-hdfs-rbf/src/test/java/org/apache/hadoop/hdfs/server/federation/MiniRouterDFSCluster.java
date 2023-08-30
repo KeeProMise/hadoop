@@ -1202,4 +1202,8 @@ public class MiniRouterDFSCluster {
       throw new IOException("Cannot wait for the namenodes", e);
     }
   }
+
+  public long getCacheFlushInterval() {
+    return cacheFlushInterval;
+  }
 }
