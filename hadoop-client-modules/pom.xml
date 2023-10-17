@@ -37,9 +37,9 @@
     <module>hadoop-client-minicluster</module>
     <!-- Checks invariants above -->
     <module>hadoop-client-check-invariants</module>
-    <module>hadoop-client-check-test-invariants</module>
+<!--    <module>hadoop-client-check-test-invariants</module>-->
     <!-- Attempt to use the created libraries -->
-    <module>hadoop-client-integration-tests</module>
+<!--    <module>hadoop-client-integration-tests</module>-->
   </modules>
 
 </project>

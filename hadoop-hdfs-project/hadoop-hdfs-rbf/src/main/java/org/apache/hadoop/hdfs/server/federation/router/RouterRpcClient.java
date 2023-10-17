@@ -596,14 +596,14 @@ public class RouterRpcClient {
           se.initCause(ioe);
           throw se;
         } else if (ioe instanceof NoNamenodesAvailableException) {
+          IOException cause = (IOException) ioe.getCause();
           if (this.rpcMonitor != null) {
             this.rpcMonitor.proxyOpNoNamenodes(nsId);
           }
           LOG.error("Cannot get available namenode for {} {} error: {}",
               nsId, rpcAddress, ioe.getMessage());
-          // Only if the namenode is unavailable,
-          // rotate cache so that client can retry the next namenode in the cache
-          if (isUnavailableException(ioe.getCause())) {
+          // Rotate cache so that client can retry the next namenode in the cache
+          if (shouldRotateCache(cause)) {
             this.namenodeResolver.rotateCache(nsId, namenode, useObserver);
           }
           // Throw RetriableException so that client can retry
@@ -759,7 +759,7 @@ public class RouterRpcClient {
    * @param ioe IOException to check.
    * @return If the exception comes from an unavailable subcluster.
    */
-  public static boolean isUnavailableException(Throwable ioe) {
+  public static boolean isUnavailableException(IOException ioe) {
     if (ioe instanceof ConnectTimeoutException ||
         ioe instanceof EOFException ||
         ioe instanceof SocketException ||
@@ -1843,5 +1843,18 @@ public class RouterRpcClient {
   private LongAccumulator getTimeOfLastCallToActive(String namespaceId) {
     return lastActiveNNRefreshTimes
         .computeIfAbsent(namespaceId, key -> new LongAccumulator(Math::max, 0));
+  }
+
+  // todo javadoc
+  private boolean shouldRotateCache(IOException ioe) {
+    if (isUnavailableException(ioe)) {
+      return true;
+    }
+    if (ioe instanceof  RemoteException) {
+      RemoteException re = (RemoteException) ioe;
+      ioe = re.unwrapRemoteException();
+      ioe = getCleanException(ioe);
+    }
+    return isUnavailableException(ioe);
   }
 }
