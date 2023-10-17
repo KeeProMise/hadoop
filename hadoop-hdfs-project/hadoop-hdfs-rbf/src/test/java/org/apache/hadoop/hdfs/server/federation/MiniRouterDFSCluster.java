@@ -132,9 +132,9 @@ public class MiniRouterDFSCluster {
   /** Mini cluster. */
   private MiniDFSCluster cluster;
 
-  protected static final long DEFAULT_HEARTBEAT_INTERVAL_MS =
+  public static final long DEFAULT_HEARTBEAT_INTERVAL_MS =
       TimeUnit.SECONDS.toMillis(5);
-  protected static final long DEFAULT_CACHE_INTERVAL_MS =
+  public static final long DEFAULT_CACHE_INTERVAL_MS =
       TimeUnit.SECONDS.toMillis(5);
   /** Heartbeat interval in milliseconds. */
   private long heartbeatInterval;

@@ -491,10 +491,22 @@ public class MembershipNamenodeResolver
   public void rotateCache(
       String nsId, FederationNamenodeContext namenode, boolean listObserversFirst) {
     cacheNS.compute(Pair.of(nsId, listObserversFirst), (ns, namenodeContexts) -> {
-      if (namenodeContexts == null || namenodeContexts.size() <= 1) {
+      if (namenodeContexts == null) {
         return namenodeContexts;
       }
-      FederationNamenodeContext firstNamenodeContext = namenodeContexts.get(0);
+      List<FederationNamenodeContext> nonOberverNnContexts = new ArrayList<>();
+      List<FederationNamenodeContext> oberverNnContexts = new ArrayList<>();
+      for (FederationNamenodeContext namenodeContext : namenodeContexts) {
+        if (namenodeContext.getState() == OBSERVER) {
+          oberverNnContexts.add(namenodeContext);
+        }else {
+          nonOberverNnContexts.add(namenodeContext);
+        }
+      }
+      if (nonOberverNnContexts.size() <= 1) {
+        return namenodeContexts;
+      }
+      FederationNamenodeContext firstNamenodeContext = nonOberverNnContexts.get(0);
       /*
        * If the first nn in the cache is active, the active nn priority cannot be lowered.
        * This happens when other threads have already updated the cache.
@@ -508,13 +520,13 @@ public class MembershipNamenodeResolver
        * This happens when other threads have already rotated the cache.
        */
       if (firstNamenodeContext.getRpcAddress().equals(namenode.getRpcAddress())) {
-        List<FederationNamenodeContext> rotatedNnContexts = new ArrayList<>(namenodeContexts);
-        Collections.rotate(rotatedNnContexts, -1);
-        String firstNamenodeId = namenodeContexts.get(0).getNamenodeId();
+        Collections.rotate(nonOberverNnContexts, -1);
+        String firstNamenodeId = nonOberverNnContexts.get(0).getNamenodeId();
         LOG.info("Rotate cache of pair <ns: {}, observer first: {}>, put namenode: {} in the " +
             "first position of the cache and namenode: {} in the last position of the cache",
             nsId, listObserversFirst, firstNamenodeId, namenode.getNamenodeId());
-        return rotatedNnContexts;
+        oberverNnContexts.addAll(nonOberverNnContexts);
+        return oberverNnContexts;
       }
       return namenodeContexts;
     });
