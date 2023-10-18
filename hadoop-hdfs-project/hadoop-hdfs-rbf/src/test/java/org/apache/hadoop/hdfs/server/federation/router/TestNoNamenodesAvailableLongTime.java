@@ -35,6 +35,7 @@ import static org.apache.hadoop.hdfs.server.federation.FederationTestUtils.trans
 import static org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster.DEFAULT_HEARTBEAT_INTERVAL_MS;
 import static org.apache.hadoop.hdfs.server.namenode.AclTestHelpers.aclEntry;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -131,11 +132,12 @@ public class TestNoNamenodesAvailableLongTime {
     conf.setInt("dfs.client.retry.max.attempts", 1);
     DFSClient routerClient = new DFSClient(new URI("hdfs://fed"), conf);
 
+    RouterContext routerContext = cluster.getRouters().get(0);
+
     // Get the second namenode in the router cache and make it active
-    setSecondNonObserverNamenodeInTheRouterCacheActive(0, false);
+    setSecondNonObserverNamenodeInTheRouterCacheActive(routerContext, 0, false);
     allRoutersHeartbeatNotLoadCache(false);
 
-    RouterContext routerContext = cluster.getRouters().get(0);
     // Get router0 metrics
     FederationRPCMetrics rpcMetrics0 = routerContext.getRouter().getRpcServer().getRPCMetrics();
     // Original failures
@@ -204,15 +206,32 @@ public class TestNoNamenodesAvailableLongTime {
   public void testUseObserver() throws Exception {
     setupCluster(1, 2, true);
     RouterContext router = cluster.getRandomRouter();
-    allRoutersHeartbeatAndLoadCache();
+    long activeProxyOps = router.getRouter().getRpcServer()
+        .getRPCMetrics().getActiveProxyOps();
+
+    FileSystem fileSystem = router.getFileSystem();
+    fileSystem.msync();
+    assertEquals(activeProxyOps+1, router.getRouter().getRpcServer()
+        .getRPCMetrics().getActiveProxyOps());
+
     transitionActiveToStandby();
-    setSecondNonObserverNamenodeInTheRouterCacheActive(2, true);
+    List<MiniRouterDFSCluster.NamenodeContext> namenodes = cluster.getNamenodes();
+
+    for (MiniRouterDFSCluster.NamenodeContext namenodeContext : namenodes) {
+      assertNotEquals(ACTIVE.ordinal(), namenodeContext.getNamenode().getNameNodeState());
+    }
+    allRoutersHeartbeatAndLoadCache();
+    setSecondNonObserverNamenodeInTheRouterCacheActive(router, 2, true);
     allRoutersHeartbeatNotLoadCache(true);
 
     assertTrue(routerCacheNoActiveNamenode(router, "ns0", true));
-    Path path = new Path("/testFile");
-    FileSystem fileSystem = router.getFileSystem();
+
+    long observerProxyOps = router.getRouter().getRpcServer()
+        .getRPCMetrics().getObserverProxyOps();
+    Path path = new Path("/");
     fileSystem.getFileStatus(path);
+    assertEquals(observerProxyOps + 1, router.getRouter().getRpcServer()
+        .getRPCMetrics().getObserverProxyOps());
   }
 
   /**
@@ -244,24 +263,20 @@ public class TestNoNamenodesAvailableLongTime {
   }
 
   private void setSecondNonObserverNamenodeInTheRouterCacheActive(
-      int numberOfObserver, boolean useObserver) throws IOException {
-    for (RouterContext routerContext : cluster.getRouters()) {
-      List<? extends FederationNamenodeContext> ns0 = routerContext.getRouter()
-          .getNamenodeResolver()
-          .getNamenodesForNameserviceId("ns0", useObserver);
+      RouterContext routerContext, int numberOfObserver, boolean useObserver) throws IOException {
+    List<? extends FederationNamenodeContext> ns0 = routerContext.getRouter()
+        .getNamenodeResolver()
+        .getNamenodesForNameserviceId("ns0", useObserver);
 
-      String nsId = ns0.get(numberOfObserver+1).getNamenodeId();
-      cluster.switchToActive("ns0", nsId);
-      assertEquals(ACTIVE.ordinal(),
-          cluster.getNamenode("ns0", nsId).getNamenode().getNameNodeState());
-    }
+    String nsId = ns0.get(numberOfObserver+1).getNamenodeId();
+    cluster.switchToActive("ns0", nsId);
+    assertEquals(ACTIVE.ordinal(),
+        cluster.getNamenode("ns0", nsId).getNamenode().getNameNodeState());
+
   }
 
   private void allRoutersHeartbeatNotLoadCache(boolean useObserver) throws IOException {
     for (RouterContext routerContext : cluster.getRouters()) {
-      List<? extends FederationNamenodeContext> ns0 = routerContext.getRouter()
-          .getNamenodeResolver()
-          .getNamenodesForNameserviceId("ns0", useObserver);
       // Manually trigger the heartbeat, but the router does not manually load the cache
       Collection<NamenodeHeartbeatService> heartbeatServices = routerContext
           .getRouter().getNamenodeHeartbeatServices();
