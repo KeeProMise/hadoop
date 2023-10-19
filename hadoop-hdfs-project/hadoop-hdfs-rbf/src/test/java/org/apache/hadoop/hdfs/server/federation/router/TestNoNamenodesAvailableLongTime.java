@@ -28,8 +28,6 @@ import java.util.Collection;
 import java.util.List;
 
 import static org.apache.hadoop.ha.HAServiceProtocol.HAServiceState.ACTIVE;
-import static org.apache.hadoop.ha.HAServiceProtocol.HAServiceState.STANDBY;
-import static org.apache.hadoop.hdfs.server.federation.FederationTestUtils.transitionClusterNSToStandby;;
 import static org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster.DEFAULT_HEARTBEAT_INTERVAL_MS;
 import static org.apache.hadoop.hdfs.server.namenode.AclTestHelpers.aclEntry;
 import static org.junit.Assert.assertEquals;
@@ -46,14 +44,17 @@ public class TestNoNamenodesAvailableLongTime {
   private static final long CACHE_FLUSH_INTERVAL_MS = 10000;
   private StateStoreDFSCluster cluster;
   private FileSystem fileSystem;
+  private RouterContext routerContext;
+  private FederationRPCMetrics rpcMetrics;
 
   @After
   public void cleanup() throws IOException {
+    rpcMetrics = null;
+    routerContext = null;
     if (fileSystem != null) {
       fileSystem.close();
       fileSystem = null;
     }
-
     if (cluster != null) {
       cluster.shutdown();
       cluster = null;
@@ -110,13 +111,9 @@ public class TestNoNamenodesAvailableLongTime {
     cluster.waitClusterUp();
   }
 
-  /**
-   *
-   */
-  @Test
-  public void testCacheShouldNotBeRotated() throws Exception {
-    setupCluster(1, 0, false);
-    transitionClusterNSToStandby(cluster);
+  private void initEnv(int numberOfObserver, boolean useObserver) throws Exception {
+    setupCluster(1, numberOfObserver, useObserver);
+    transitionActiveToStandby();
     allRoutersHeartbeat();
     allRoutersLoadCache();
 
@@ -124,33 +121,49 @@ public class TestNoNamenodesAvailableLongTime {
 
     // Make sure all namenodes are in standby state
     for (MiniRouterDFSCluster.NamenodeContext namenodeContext : namenodes) {
-      assertEquals(STANDBY.ordinal(), namenodeContext.getNamenode().getNameNodeState());
+      assertNotEquals(ACTIVE.ordinal(), namenodeContext.getNamenode().getNameNodeState());
     }
 
-    RouterContext routerContext = cluster.getRandomRouter();
+    routerContext = cluster.getRandomRouter();
 
     // Get the second namenode in the router cache and make it active
-    setSecondNonObserverNamenodeInTheRouterCacheActive(routerContext, 0, false);
+    setSecondNonObserverNamenodeInTheRouterCacheActive(numberOfObserver, false);
     allRoutersHeartbeat();
 
     // Get router metrics
-    FederationRPCMetrics rpcMetrics = routerContext.getRouter().getRpcServer().getRPCMetrics();
+    rpcMetrics = routerContext.getRouter().getRpcServer().getRPCMetrics();
+
+    assertTrue(routerCacheNoActiveNamenode(routerContext, "ns0", useObserver));
+
+    // Retries is 2 (see FailoverOnNetworkExceptionRetry#shouldRetry, will fail
+    // when reties > max.attempts), so total access is 3.
+    routerContext.getConf().setInt("dfs.client.retry.max.attempts", 1);
+
+    if (useObserver) {
+      fileSystem = routerContext.getFileSystemWithObserverReadProxyProvider();
+    } else {
+      fileSystem = routerContext.getFileSystemWithConfiguredFailoverProxyProvider();
+    }
+  }
+
+  /**
+   *
+   */
+  @Test
+  public void testCacheShouldNotBeRotated() throws Exception {
+    initEnv(0, false);
     // Original failures
     long proxyOpNoNamenodes = rpcMetrics.getProxyOpNoNamenodes();
 
     // At this time, the router has recorded 2 standby namenodes in memory.
     assertTrue(routerCacheNoActiveNamenode(routerContext, "ns0", false));
 
-    // Retries is 2 (see FailoverOnNetworkExceptionRetry#shouldRetry, will fail
-    // when reties > max.attempts), so total access is 3.
-    routerContext.getConf().setInt("dfs.client.retry.max.attempts", 1);
     /*
      * The first accessed namenode is indeed standby,
      * then an NoNamenodesAvailableException will be reported for the first access,
      * and the next access will be successful.
      */
     Path path = new Path("/test.file");
-    fileSystem = routerContext.getFileSystemWithConfiguredFailoverProxyProvider();
     fileSystem.create(path);
     assertEquals(proxyOpNoNamenodes + 1, rpcMetrics.getProxyOpNoNamenodes());
     proxyOpNoNamenodes = rpcMetrics.getProxyOpNoNamenodes();
@@ -172,7 +185,6 @@ public class TestNoNamenodesAvailableLongTime {
      * If the router sends an illegal operation to active nn,
      * NoNamenodesAvailableException will still be reported at this time,
      * and the cache should not be rotated due to illegal operations.
-     *
      */
     List<AclEntry> aclSpec = Lists.newArrayList(aclEntry(DEFAULT, USER, "foo", ALL));
     try {
@@ -198,36 +210,19 @@ public class TestNoNamenodesAvailableLongTime {
 
   @Test
   public void testUseObserver() throws Exception {
-    setupCluster(1, 2, true);
+    initEnv(2, true);
 
-    transitionActiveToStandby();
-    List<MiniRouterDFSCluster.NamenodeContext> namenodes = cluster.getNamenodes();
-
-    for (MiniRouterDFSCluster.NamenodeContext namenodeContext : namenodes) {
-      assertNotEquals(ACTIVE.ordinal(), namenodeContext.getNamenode().getNameNodeState());
-    }
-    allRoutersHeartbeat();
-    allRoutersLoadCache();
-
-    RouterContext routerContext = cluster.getRandomRouter();
-    setSecondNonObserverNamenodeInTheRouterCacheActive(routerContext, 2, true);
-    allRoutersHeartbeat();
-
-    // Get router metrics
-    FederationRPCMetrics rpcMetrics = routerContext.getRouter().getRpcServer().getRPCMetrics();
-    assertTrue(routerCacheNoActiveNamenode(routerContext, "ns0", true));
-
-    fileSystem = routerContext.getFileSystemWithObserverReadProxyProvider();
     Path path = new Path("/");
     long observerProxyOps = rpcMetrics.getObserverProxyOps();
+    long proxyOpNoNamenodes = rpcMetrics.getProxyOpNoNamenodes();
+    assertTrue(routerCacheNoActiveNamenode(routerContext, "ns0", true));
     fileSystem.getFileStatus(path);
     assertEquals(observerProxyOps + 1, rpcMetrics.getObserverProxyOps());
+    assertEquals(proxyOpNoNamenodes + 1, rpcMetrics.getProxyOpNoNamenodes());
 
     stopObserver(2);
     long proxyOpFailureOps = rpcMetrics.getProxyOpFailureCommunicate();
-
-    long proxyOpNoNamenodes = rpcMetrics.getProxyOpNoNamenodes();
-
+    proxyOpNoNamenodes = rpcMetrics.getProxyOpNoNamenodes();
     long standbyProxyOps = rpcMetrics.getProxyOps();
 
     fileSystem.getFileStatus(new Path("/"));
@@ -254,14 +249,14 @@ public class TestNoNamenodesAvailableLongTime {
   }
 
   private void allRoutersLoadCache() {
-    for (MiniRouterDFSCluster.RouterContext routerContext : cluster.getRouters()) {
+    for (MiniRouterDFSCluster.RouterContext context : cluster.getRouters()) {
       // Update service cache
-      routerContext.getRouter().getStateStore().refreshCaches(true);
+      context.getRouter().getStateStore().refreshCaches(true);
     }
   }
 
   private void setSecondNonObserverNamenodeInTheRouterCacheActive(
-      RouterContext routerContext, int numberOfObserver, boolean useObserver) throws IOException {
+      int numberOfObserver, boolean useObserver) throws IOException {
     List<? extends FederationNamenodeContext> ns0 = routerContext.getRouter()
         .getNamenodeResolver()
         .getNamenodesForNameserviceId("ns0", useObserver);
@@ -274,9 +269,9 @@ public class TestNoNamenodesAvailableLongTime {
   }
 
   private void allRoutersHeartbeat() throws IOException {
-    for (RouterContext routerContext : cluster.getRouters()) {
+    for (RouterContext context : cluster.getRouters()) {
       // Manually trigger the heartbeat, but the router does not manually load the cache
-      Collection<NamenodeHeartbeatService> heartbeatServices = routerContext
+      Collection<NamenodeHeartbeatService> heartbeatServices = context
           .getRouter().getNamenodeHeartbeatServices();
       for (NamenodeHeartbeatService service : heartbeatServices) {
         service.periodicInvoke();
