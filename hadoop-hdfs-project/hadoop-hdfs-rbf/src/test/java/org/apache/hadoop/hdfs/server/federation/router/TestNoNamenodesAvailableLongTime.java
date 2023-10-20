@@ -41,6 +41,7 @@ import static org.junit.Assert.assertTrue;
  */
 public class TestNoNamenodesAvailableLongTime {
 
+  // router load cache interval 10s
   private static final long CACHE_FLUSH_INTERVAL_MS = 10000;
   private StateStoreDFSCluster cluster;
   private FileSystem fileSystem;
@@ -61,6 +62,13 @@ public class TestNoNamenodesAvailableLongTime {
     }
   }
 
+  /**
+   * Set up state store cluster.
+   *
+   * @param numNameservices number of name services
+   * @param numberOfObserver number of observer
+   * @param useObserver whether to use observer
+   */
   private void setupCluster(int numNameservices, int numberOfObserver, boolean useObserver)
       throws Exception {
     if (!useObserver) {
@@ -77,6 +85,7 @@ public class TestNoNamenodesAvailableLongTime {
         .heartbeat()
         .build();
 
+    // Set router observer related configs
     if (useObserver) {
       routerConf.setBoolean(RBFConfigKeys.DFS_ROUTER_OBSERVER_READ_DEFAULT_KEY, true);
       routerConf.setBoolean(DFSConfigKeys.DFS_HA_TAILEDITS_INPROGRESS_KEY, true);
@@ -85,16 +94,13 @@ public class TestNoNamenodesAvailableLongTime {
 
     // Reduce the number of RPC clients threads to overload the Router easy
     routerConf.setInt(RBFConfigKeys.DFS_ROUTER_CLIENT_THREADS_SIZE, 4);
-    // Overload control
-    routerConf.setBoolean(
-        RBFConfigKeys.DFS_ROUTER_CLIENT_REJECT_OVERLOAD, false);
 
-    // No need for datanodes as we use renewLease() for testing
+    // No need for datanodes
     cluster.setNumDatanodesPerNameservice(0);
     cluster.addRouterOverrides(routerConf);
 
-
     cluster.startCluster();
+
     // Making one Namenode active per nameservice
     if (cluster.isHighAvailability()) {
       for (String ns : cluster.getNameservices()) {
@@ -111,9 +117,16 @@ public class TestNoNamenodesAvailableLongTime {
     cluster.waitClusterUp();
   }
 
+  /**
+   * Initialize the test environment and start the cluster so that
+   * there is no active namenode record in the router cache,
+   * but the second non-observer namenode in the router cache is actually active.
+   */
   private void initEnv(int numberOfObserver, boolean useObserver) throws Exception {
     setupCluster(1, numberOfObserver, useObserver);
+    // Transition all namenodes in the cluster are standby.
     transitionActiveToStandby();
+    //
     allRoutersHeartbeat();
     allRoutersLoadCache();
 
@@ -146,31 +159,25 @@ public class TestNoNamenodesAvailableLongTime {
     }
   }
 
-  /**
-   *
-   */
   @Test
-  public void testCacheShouldNotBeRotated() throws Exception {
+  public void testShouldRotatedCache() throws Exception {
     initEnv(0, false);
-    // Original failures
-    long proxyOpNoNamenodes = rpcMetrics.getProxyOpNoNamenodes();
-
     // At this time, the router has recorded 2 standby namenodes in memory.
     assertTrue(routerCacheNoActiveNamenode(routerContext, "ns0", false));
 
-    /*
-     * The first accessed namenode is indeed standby,
-     * then an NoNamenodesAvailableException will be reported for the first access,
-     * and the next access will be successful.
-     */
     Path path = new Path("/test.file");
     fileSystem.create(path);
-    assertEquals(proxyOpNoNamenodes + 1, rpcMetrics.getProxyOpNoNamenodes());
-    proxyOpNoNamenodes = rpcMetrics.getProxyOpNoNamenodes();
+    assertEquals(1, rpcMetrics.getProxyOpNoNamenodes());
 
     // At this time, the router has recorded 2 standby namenodes in memory.
     assertTrue(routerCacheNoActiveNamenode(routerContext, "ns0", false));
+  }
 
+  @Test
+  public void testShouldNotBeRotatedCache() throws Exception {
+    testShouldRotatedCache();
+    long proxyOpNoNamenodes = rpcMetrics.getProxyOpNoNamenodes();
+    Path path = new Path("/test.file");
     /*
      * we have put the actually active namenode at the front of the cache by rotating the cache.
      * Therefore, the access does not cause NoNamenodesAvailableException.
@@ -213,22 +220,35 @@ public class TestNoNamenodesAvailableLongTime {
     initEnv(2, true);
 
     Path path = new Path("/");
-    long observerProxyOps = rpcMetrics.getObserverProxyOps();
-    long proxyOpNoNamenodes = rpcMetrics.getProxyOpNoNamenodes();
     assertTrue(routerCacheNoActiveNamenode(routerContext, "ns0", true));
     fileSystem.getFileStatus(path);
-    assertEquals(observerProxyOps + 1, rpcMetrics.getObserverProxyOps());
-    assertEquals(proxyOpNoNamenodes + 1, rpcMetrics.getProxyOpNoNamenodes());
+    assertEquals(1, rpcMetrics.getObserverProxyOps());
+    assertEquals(1, rpcMetrics.getProxyOpNoNamenodes());
 
-    stopObserver(2);
-    long proxyOpFailureOps = rpcMetrics.getProxyOpFailureCommunicate();
-    proxyOpNoNamenodes = rpcMetrics.getProxyOpNoNamenodes();
-    long standbyProxyOps = rpcMetrics.getProxyOps();
+    assertTrue(routerCacheNoActiveNamenode(routerContext, "ns0", true));
+  }
+
+  @Test
+  public void testAtLeastOneObserverNormal() throws Exception {
+    initEnv(2, true);
+    stopObserver(1);
 
     fileSystem.getFileStatus(new Path("/"));
-    assertEquals(proxyOpFailureOps + 2, rpcMetrics.getProxyOpFailureCommunicate());
-    assertEquals(proxyOpNoNamenodes + 1, rpcMetrics.getProxyOpNoNamenodes());
-    assertEquals(standbyProxyOps + 1, rpcMetrics.getProxyOps());
+    assertEquals(1, rpcMetrics.getProxyOpNoNamenodes());
+    assertEquals(1, rpcMetrics.getObserverProxyOps());
+
+    assertTrue(routerCacheNoActiveNamenode(routerContext, "ns0", true));
+  }
+
+  @Test
+  public void testAllObserverAbnormality() throws Exception {
+    initEnv(2, true);
+    stopObserver(2);
+
+    fileSystem.getFileStatus(new Path("/"));
+    assertEquals(2, rpcMetrics.getProxyOpFailureCommunicate());
+    assertEquals(2, rpcMetrics.getProxyOpNoNamenodes());
+    assertEquals(2, rpcMetrics.getProxyOps());
 
     assertTrue(routerCacheNoActiveNamenode(routerContext, "ns0", true));
   }
