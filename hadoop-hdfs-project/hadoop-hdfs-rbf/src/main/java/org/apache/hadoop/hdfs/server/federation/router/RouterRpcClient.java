@@ -787,7 +787,9 @@ public class RouterRpcClient {
   private boolean isClusterUnAvailable(
       String nsId, FederationNamenodeContext namenode,
       boolean listObserverFirst) throws IOException {
-
+    // Use observer and the namenode that causes the exception is an observer,
+    // false is returned so that the oberver can be marked as unavailable,so other observers
+    // or active namenode which is standby in the cache of the router can be retried.
     if (listObserverFirst && namenode.getState() == FederationNamenodeServiceState.OBSERVER) {
       return false;
     }
@@ -1845,7 +1847,14 @@ public class RouterRpcClient {
         .computeIfAbsent(namespaceId, key -> new LongAccumulator(Math::max, 0));
   }
 
-  // todo javadoc
+  /**
+   * Determine whether router rotated cache is required when NoNamenodesAvailableException occurs.
+   *
+   * @param ioe cause of the NoNamenodesAvailableException.
+   * @return true if NoNamenodesAvailableException occurs due to
+   * {@link RouterRpcClient#isUnavailableException(IOException) unavailable exception},
+   * otherwise false.
+   */
   private boolean shouldRotateCache(IOException ioe) {
     if (isUnavailableException(ioe)) {
       return true;

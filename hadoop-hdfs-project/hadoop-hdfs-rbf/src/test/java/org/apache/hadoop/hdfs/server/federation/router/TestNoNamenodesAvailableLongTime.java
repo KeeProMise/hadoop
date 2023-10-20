@@ -35,9 +35,12 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
- * When failover occurs, the router may record that the ns has no active namenode.
+ * When failover occurs, the router may record that the ns has no active namenode
+ * even if there is actually an active namenode.
  * Only when the router updates the cache next time can the memory status be updated,
- * causing the router to report NoNamenodesAvailableException for a long time.
+ * causing the router to report NoNamenodesAvailableException for a long time,
+ *
+ * @see org.apache.hadoop.hdfs.server.federation.router.NoNamenodesAvailableException
  */
 public class TestNoNamenodesAvailableLongTime {
 
@@ -159,20 +162,35 @@ public class TestNoNamenodesAvailableLongTime {
     }
   }
 
+  /**
+   * If NoNamenodesAvailableException occurs due to
+   * {@link RouterRpcClient#isUnavailableException(IOException) unavailable exception},
+   * should rotated Cache.
+   */
   @Test
   public void testShouldRotatedCache() throws Exception {
+    // 2 namenodes: 1 active, 1 standby.
+    // But there is no active namenode in router cache.
     initEnv(0, false);
     // At this time, the router has recorded 2 standby namenodes in memory.
     assertTrue(routerCacheNoActiveNamenode(routerContext, "ns0", false));
 
     Path path = new Path("/test.file");
+    // The first create operation will cause NoNamenodesAvailableException and RotatedCache.
+    // After retrying, create and complete operation will be executed successfully.
     fileSystem.create(path);
     assertEquals(1, rpcMetrics.getProxyOpNoNamenodes());
 
-    // At this time, the router has recorded 2 standby namenodes in memory.
+    // At this time, the router has recorded 2 standby namenodes in memory,
+    // the operation can be successful without waiting for the router load cache.
     assertTrue(routerCacheNoActiveNamenode(routerContext, "ns0", false));
   }
 
+  /**
+   * If a request still fails even if it is sent to active,
+   * then the change operation itself is illegal,
+   * the cache should not be rotated due to illegal operations.
+   */
   @Test
   public void testShouldNotBeRotatedCache() throws Exception {
     testShouldRotatedCache();
@@ -180,7 +198,7 @@ public class TestNoNamenodesAvailableLongTime {
     Path path = new Path("/test.file");
     /*
      * we have put the actually active namenode at the front of the cache by rotating the cache.
-     * Therefore, the access does not cause NoNamenodesAvailableException.
+     * Therefore, the setPermission operation does not cause NoNamenodesAvailableException.
      */
     fileSystem.setPermission(path, FsPermission.createImmutable((short)0640));
     assertEquals(proxyOpNoNamenodes, rpcMetrics.getProxyOpNoNamenodes());
@@ -189,9 +207,9 @@ public class TestNoNamenodesAvailableLongTime {
     assertTrue(routerCacheNoActiveNamenode(routerContext, "ns0", false));
 
     /*
-     * If the router sends an illegal operation to active nn,
-     * NoNamenodesAvailableException will still be reported at this time,
-     * and the cache should not be rotated due to illegal operations.
+     * Even if the router transfers the illegal request to active,
+     * NoNamenodesAvailableException will still be generated.
+     * Therefore, rotated cache is not needed.
      */
     List<AclEntry> aclSpec = Lists.newArrayList(aclEntry(DEFAULT, USER, "foo", ALL));
     try {
@@ -204,6 +222,8 @@ public class TestNoNamenodesAvailableLongTime {
           "org.apache.hadoop.hdfs.protocol.AclException: Invalid ACL: " +
           "only directories may have a default ACL. Path: /test.file"));
     }
+    // Retries is 2 (see FailoverOnNetworkExceptionRetry#shouldRetry, will fail
+    // when reties > max.attempts), so total access is 3.
     assertEquals(proxyOpNoNamenodes + 3, rpcMetrics.getProxyOpNoNamenodes());
     proxyOpNoNamenodes = rpcMetrics.getProxyOpNoNamenodes();
 
@@ -212,49 +232,99 @@ public class TestNoNamenodesAvailableLongTime {
     fileSystem.getFileStatus(path);
     assertEquals(proxyOpNoNamenodes, rpcMetrics.getProxyOpNoNamenodes());
 
+    // At this time, the router has recorded 2 standby namenodes in memory,
+    // the operation can be successful without waiting for the router load cache.
     assertTrue(routerCacheNoActiveNamenode(routerContext, "ns0", false));
   }
 
+  /**
+   * In the observer scenario, NoNamenodesAvailableException occurs,
+   * the operation can be successful without waiting for the router load cache.
+   */
   @Test
   public void testUseObserver() throws Exception {
+    // 4 namenodes: 2 observers, 1 active, 1 standby.
+    // But there is no active namenode in router cache.
     initEnv(2, true);
 
     Path path = new Path("/");
+    // At this time, the router has recorded 2 standby namenodes in memory.
     assertTrue(routerCacheNoActiveNamenode(routerContext, "ns0", true));
+
+    // The first msync operation will cause NoNamenodesAvailableException and RotatedCache.
+    // After retrying, msync and getFileInfo operation will be executed successfully.
     fileSystem.getFileStatus(path);
     assertEquals(1, rpcMetrics.getObserverProxyOps());
     assertEquals(1, rpcMetrics.getProxyOpNoNamenodes());
 
-    assertTrue(routerCacheNoActiveNamenode(routerContext, "ns0", true));
-  }
-
-  @Test
-  public void testAtLeastOneObserverNormal() throws Exception {
-    initEnv(2, true);
-    stopObserver(1);
-
-    fileSystem.getFileStatus(new Path("/"));
-    assertEquals(1, rpcMetrics.getProxyOpNoNamenodes());
-    assertEquals(1, rpcMetrics.getObserverProxyOps());
-
-    assertTrue(routerCacheNoActiveNamenode(routerContext, "ns0", true));
-  }
-
-  @Test
-  public void testAllObserverAbnormality() throws Exception {
-    initEnv(2, true);
-    stopObserver(2);
-
-    fileSystem.getFileStatus(new Path("/"));
-    assertEquals(2, rpcMetrics.getProxyOpFailureCommunicate());
-    assertEquals(2, rpcMetrics.getProxyOpNoNamenodes());
-    assertEquals(2, rpcMetrics.getProxyOps());
-
+    // At this time, the router has recorded 2 standby namenodes in memory,
+    // the operation can be successful without waiting for the router load cache.
     assertTrue(routerCacheNoActiveNamenode(routerContext, "ns0", true));
   }
 
   /**
-   * Determine whether the router has an active namenode.
+   * In a multi-observer environment, if at least one observer is normal,
+   * read requests can still succeed even if NoNamenodesAvailableException occurs.
+   */
+  @Test
+  public void testAtLeastOneObserverNormal() throws Exception {
+    // 4 namenodes: 2 observers, 1 active, 1 standby.
+    // But there is no active namenode in router cache.
+    initEnv(2, true);
+    // Shutdown one observer.
+    stopObserver(1);
+
+    /*
+     * The first msync operation will cause NoNamenodesAvailableException and RotatedCache.
+     * After retrying, msync operation will be executed successfully.
+     * Each read request will shuffle the observer,
+     * if the getFileInfo operation is sent to the downed observer,
+     * it will cause NoNamenodesAvailableException,
+     * at this time, the request can be retried to the normal observer,
+     * no NoNamenodesAvailableException will be generated and the operation will be successful.
+     */
+    fileSystem.getFileStatus(new Path("/"));
+    assertEquals(1, rpcMetrics.getProxyOpNoNamenodes());
+    assertEquals(1, rpcMetrics.getObserverProxyOps());
+
+    // At this time, the router has recorded 2 standby namenodes in memory,
+    // the operation can be successful without waiting for the router load cache.
+    assertTrue(routerCacheNoActiveNamenode(routerContext, "ns0", true));
+  }
+
+  /**
+   * If all obervers are down, read requests can succeed,
+   * even if a NoNamenodesAvailableException occurs.
+   */
+  @Test
+  public void testAllObserverAbnormality() throws Exception {
+    // 4 namenodes: 2 observers, 1 active, 1 standby.
+    // But there is no active namenode in router cache.
+    initEnv(2, true);
+    // Shutdown all observers.
+    stopObserver(2);
+
+    /*
+     * The first msync operation will cause NoNamenodesAvailableException and RotatedCache.
+     * After retrying, msync operation will be executed successfully.
+     * The getFileInfo operation retried 2 namenodes, both causing UnavailableException,
+     * and continued to retry to the standby namenode,
+     * causing NoNamenodesAvailableException and RotatedCache,
+     * and the execution was successful after retrying.
+     */
+    fileSystem.getFileStatus(new Path("/"));
+    assertEquals(2, rpcMetrics.getProxyOpFailureCommunicate());
+    assertEquals(2, rpcMetrics.getProxyOpNoNamenodes());
+
+    // At this time, the router has recorded 2 standby namenodes in memory,
+    // the operation can be successful without waiting for the router load cache.
+    assertTrue(routerCacheNoActiveNamenode(routerContext, "ns0", true));
+  }
+
+  /**
+   * Determine whether cache of the router has an active namenode.
+   *
+   * @return true if no active namenode, otherwise false.
    */
   private boolean routerCacheNoActiveNamenode(
       RouterContext context, String nsId, boolean useObserver) throws IOException {
@@ -268,6 +338,9 @@ public class TestNoNamenodesAvailableLongTime {
     return true;
   }
 
+  /**
+   * All routers in the cluster force loadcache.
+   */
   private void allRoutersLoadCache() {
     for (MiniRouterDFSCluster.RouterContext context : cluster.getRouters()) {
       // Update service cache
@@ -275,6 +348,9 @@ public class TestNoNamenodesAvailableLongTime {
     }
   }
 
+  /**
+   * Set the second non-observer state namenode in the router cache to active.
+   */
   private void setSecondNonObserverNamenodeInTheRouterCacheActive(
       int numberOfObserver, boolean useObserver) throws IOException {
     List<? extends FederationNamenodeContext> ns0 = routerContext.getRouter()
@@ -288,6 +364,9 @@ public class TestNoNamenodesAvailableLongTime {
 
   }
 
+  /**
+   * All routers in the cluster force heartbeat.
+   */
   private void allRoutersHeartbeat() throws IOException {
     for (RouterContext context : cluster.getRouters()) {
       // Manually trigger the heartbeat, but the router does not manually load the cache
@@ -299,6 +378,9 @@ public class TestNoNamenodesAvailableLongTime {
     }
   }
 
+  /**
+   * Transition the active namenode in the cluster to standby.
+   */
   private void transitionActiveToStandby() {
     if (cluster.isHighAvailability()) {
       for (String ns : cluster.getNameservices()) {
@@ -312,7 +394,12 @@ public class TestNoNamenodesAvailableLongTime {
     }
   }
 
-  private int stopObserver(int num) {
+  /**
+   * Shutdown oberver namenode in the cluste.
+   *
+   * @param num The number of shutdown oberver.
+   */
+  private void stopObserver(int num) {
     int nnIndex;
     for (nnIndex = 0; nnIndex < cluster.getNamenodes().size(); nnIndex++) {
       NameNode nameNode = cluster.getCluster().getNameNode(nnIndex);
@@ -324,6 +411,5 @@ public class TestNoNamenodesAvailableLongTime {
         }
       }
     }
-    return nnIndex;
   }
 }
