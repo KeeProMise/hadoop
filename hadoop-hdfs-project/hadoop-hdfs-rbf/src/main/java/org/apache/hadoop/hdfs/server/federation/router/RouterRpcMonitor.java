@@ -68,6 +68,9 @@ public interface RouterRpcMonitor {
    */
   void proxyOpComplete(boolean success, String nsId, FederationNamenodeServiceState state);
 
+  void proxyOpComplete(
+      boolean success, String nsId, FederationNamenodeServiceState state, long costMs);
+
   /**
    * Failed to proxy an operation to a namenode because it was in standby.
    * @param nsId nameservice id.

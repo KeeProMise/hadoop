@@ -692,11 +692,11 @@ public class RouterRpcClient {
     }
 
     addClientInfoToCallerContext(ugi);
+    // transfer originCall & callerContext to worker threads of executor.
+    final Call originCall = Server.getCurCall().get();
+    final CallerContext originContext = CallerContext.getCurrent();
 
-    if (rpcMonitor != null) {
-      rpcMonitor.proxyOp();
-    }
-
+    final long startProxyTime = Time.monotonicNow();
     Map<FederationNamenodeContext, IOException> ioes = new LinkedHashMap<>();
 
     CompletableFuture<Object[]> completableFuture =
@@ -711,8 +711,8 @@ public class RouterRpcClient {
           return CompletableFuture.completedFuture(
               new Object[]{shouldUseObserver, failover, complete, args[3]});
         }
-        return invokeAsyncTask(
-              ioes, ugi, namenode, shouldUseObserver, failover, protocol, method, params);
+        return invokeAsyncTask(originCall, originContext, startProxyTime, ioes, ugi,
+            namenode, shouldUseObserver, failover, protocol, method, params);
       });
     }
 
@@ -754,6 +754,9 @@ public class RouterRpcClient {
 
 
   private CompletableFuture<Object[]> invokeAsyncTask(
+      final Call originCall,
+      final CallerContext callerContext,
+      final long startProxyTime,
       final Map<FederationNamenodeContext, IOException> ioes,
       final UserGroupInformation ugi,
       FederationNamenodeContext namenode,
@@ -761,7 +764,6 @@ public class RouterRpcClient {
       boolean failover,
       final Class<?> protocol, final Method method, final Object... params) {
 
-    System.out.println("zjtest[" + namenode+"]" + " " + method);
     if (!useObserver && (namenode.getState() == FederationNamenodeServiceState.OBSERVER)) {
       return CompletableFuture.completedFuture(new Object[]{useObserver, failover, false, null});
     }
@@ -770,7 +772,8 @@ public class RouterRpcClient {
     try {
       ConnectionContext connection = getConnection(ugi, nsId, rpcAddress, protocol);
       ProxyAndInfo<?> client = connection.getClient();
-      return invokeAsync(nsId, namenode, useObserver, 0, method, client.getProxy(), params)
+      return invokeAsync(originCall, callerContext, nsId, namenode, useObserver,
+          0, method, client.getProxy(), params)
           .handle((result, e) -> {
             connection.release();
             boolean complete = false;
@@ -787,7 +790,8 @@ public class RouterRpcClient {
                 }
               }
               if (this.rpcMonitor != null) {
-                this.rpcMonitor.proxyOpComplete(true, nsId, namenode.getState());
+                this.rpcMonitor.proxyOpComplete(
+                    true, nsId, namenode.getState(), Time.monotonicNow() - startProxyTime);
               }
               if (this.router.getRouterClientMetrics() != null) {
                 this.router.getRouterClientMetrics().incInvokedMethod(method);
@@ -826,7 +830,8 @@ public class RouterRpcClient {
                 return new Object[]{useObserver, tmpFailover, complete, null};
               } else if (ioe instanceof RemoteException) {
                 if (this.rpcMonitor != null) {
-                  this.rpcMonitor.proxyOpComplete(true, nsId, namenode.getState());
+                  this.rpcMonitor.proxyOpComplete(
+                      true, nsId, namenode.getState(), Time.monotonicNow() - startProxyTime);
                 }
                 RemoteException re = (RemoteException) ioe;
                 ioe = re.unwrapRemoteException();
@@ -851,7 +856,8 @@ public class RouterRpcClient {
                 // Communication retries are handled by the retry policy
                 if (this.rpcMonitor != null) {
                   this.rpcMonitor.proxyOpFailureCommunicate(nsId);
-                  this.rpcMonitor.proxyOpComplete(false, nsId, namenode.getState());
+                  this.rpcMonitor.proxyOpComplete(
+                      false, nsId, namenode.getState(), Time.monotonicNow() - startProxyTime);
                 }
                 throw new CompletionException(ioe);
               }
@@ -873,11 +879,14 @@ public class RouterRpcClient {
   }
 
   public CompletableFuture<Object> invokeAsync(
+      final Call originCall,
+      final CallerContext callerContext,
       String nsId, FederationNamenodeContext namenode, Boolean listObserverFirst,
       int retryCount, final Method method,
       final Object obj, final Object... params) {
     return CompletableFuture.supplyAsync(() -> {
       try {
+        transferThreadLocalContext(originCall, callerContext);
         return invoke(nsId, namenode, listObserverFirst, retryCount, method, obj, params);
       } catch (IOException e) {
         throw new CompletionException(e);
