@@ -683,7 +683,7 @@ public class RouterRpcClient {
       final List<? extends FederationNamenodeContext> namenodes,
       boolean useObserver,
       final Class<?> protocol, final Method method, final Object... params)
-      throws ConnectException, StandbyException, IOException {
+      throws IOException {
 
     if (namenodes == null || namenodes.isEmpty()) {
       throw new IOException("No namenodes to invoke " + method.getName() +
@@ -693,7 +693,6 @@ public class RouterRpcClient {
 
     addClientInfoToCallerContext(ugi);
 
-    Object ret = null;
     if (rpcMonitor != null) {
       rpcMonitor.proxyOp();
     }
@@ -713,15 +712,49 @@ public class RouterRpcClient {
               new Object[]{shouldUseObserver, failover, complete, args[3]});
         }
         return invokeAsyncTask(
-              ugi, namenode, shouldUseObserver, failover, protocol, method, params);
+              ioes, ugi, namenode, shouldUseObserver, failover, protocol, method, params);
       });
     }
 
-    return completableFuture.thenApply(args -> args[3]);
+    return completableFuture.thenApply(args -> {
+      Boolean complete = (Boolean) args[2];
+      if (complete) {
+        return args[3];
+      }
+      // All namenodes were unavailable or in standby
+      String msg = "No namenode available to invoke " + method.getName() + " " +
+          Arrays.deepToString(params) + " in " + namenodes + " from " +
+          router.getRouterId();
+      LOG.error(msg);
+      int exConnect = 0;
+      for (Entry<FederationNamenodeContext, IOException> entry :
+          ioes.entrySet()) {
+        FederationNamenodeContext namenode = entry.getKey();
+        String nnKey = namenode.getNamenodeKey();
+        String addr = namenode.getRpcAddress();
+        IOException ioe = entry.getValue();
+        if (ioe instanceof StandbyException) {
+          LOG.error("{} at {} is in Standby: {}",
+              nnKey, addr, ioe.getMessage());
+        } else if (isUnavailableException(ioe)) {
+          exConnect++;
+          LOG.error("{} at {} cannot be reached: {}",
+              nnKey, addr, ioe.getMessage());
+        } else {
+          LOG.error("{} at {} error: \"{}\"", nnKey, addr, ioe.getMessage());
+        }
+      }
+      if (exConnect == ioes.size()) {
+        throw new CompletionException(new ConnectException(msg));
+      } else {
+        throw new CompletionException(new StandbyException(msg));
+      }
+    });
   }
 
 
   private CompletableFuture<Object[]> invokeAsyncTask(
+      final Map<FederationNamenodeContext, IOException> ioes,
       final UserGroupInformation ugi,
       FederationNamenodeContext namenode,
       boolean useObserver,
@@ -730,18 +763,12 @@ public class RouterRpcClient {
 
     System.out.println("zjtest[" + namenode+"]" + " " + method);
     if (!useObserver && (namenode.getState() == FederationNamenodeServiceState.OBSERVER)) {
-      return CompletableFuture.completedFuture(new Object[]{useObserver, failover, null});
+      return CompletableFuture.completedFuture(new Object[]{useObserver, failover, false, null});
     }
     String nsId = namenode.getNameserviceId();
     String rpcAddress = namenode.getRpcAddress();
-    return CompletableFuture.supplyAsync(() -> {
-      try {
-        return RouterRpcClient.this.getConnection(ugi, nsId, rpcAddress, protocol);
-      } catch (IOException e) {
-        throw new CompletionException(e);
-      }
-    }).thenCompose((Function<Object, CompletionStage<Object[]>>) con -> {
-      ConnectionContext connection = (ConnectionContext) con;
+    try {
+      ConnectionContext connection = getConnection(ugi, nsId, rpcAddress, protocol);
       ProxyAndInfo<?> client = connection.getClient();
       return invokeAsync(nsId, namenode, useObserver, 0, method, client.getProxy(), params)
           .handle((result, e) -> {
@@ -770,6 +797,7 @@ public class RouterRpcClient {
             Throwable cause = e.getCause();
             if (cause instanceof IOException) {
               IOException ioe = (IOException) cause;
+              ioes.put(namenode, ioe);
               if (ioe instanceof ObserverRetryOnActiveException) {
                 LOG.info("Encountered ObserverRetryOnActiveException from {}."
                     + " Retry active namenode directly.", namenode);
@@ -805,16 +833,6 @@ public class RouterRpcClient {
                 ioe = getCleanException(ioe);
                 // RemoteException returned by NN
                 throw new CompletionException(ioe);
-              } else if (ioe instanceof ConnectionNullException) {
-                if (this.rpcMonitor != null) {
-                  this.rpcMonitor.proxyOpFailureCommunicate(nsId);
-                }
-                LOG.error("Get connection for {} {} error: {}", nsId, rpcAddress,
-                    ioe.getMessage());
-                // Throw StandbyException so that client can retry
-                StandbyException se = new StandbyException(ioe.getMessage());
-                se.initCause(ioe);
-                throw new CompletionException(se);
               } else if (ioe instanceof NoNamenodesAvailableException) {
                 IOException cau = (IOException) ioe.getCause();
                 if (this.rpcMonitor != null) {
@@ -828,19 +846,30 @@ public class RouterRpcClient {
                 }
                 // Throw RetriableException so that client can retry
                 throw new CompletionException(new RetriableException(ioe));
+              } else {
+                // Other communication error, this is a failure
+                // Communication retries are handled by the retry policy
+                if (this.rpcMonitor != null) {
+                  this.rpcMonitor.proxyOpFailureCommunicate(nsId);
+                  this.rpcMonitor.proxyOpComplete(false, nsId, namenode.getState());
+                }
+                throw new CompletionException(ioe);
               }
-            }else {
-              // Other communication error, this is a failure
-              // Communication retries are handled by the retry policy
-              if (this.rpcMonitor != null) {
-                this.rpcMonitor.proxyOpFailureCommunicate(nsId);
-                this.rpcMonitor.proxyOpComplete(false, nsId, namenode.getState());
-              }
-              throw new CompletionException(cause);
             }
-            return new Object[]{useObserver, failover, complete, null};
+            throw new CompletionException(cause);
           });
-    });
+    }catch (IOException ioe) {
+      assert ioe instanceof ConnectionNullException;
+      if (this.rpcMonitor != null) {
+        this.rpcMonitor.proxyOpFailureCommunicate(nsId);
+      }
+      LOG.error("Get connection for {} {} error: {}", nsId, rpcAddress,
+          ioe.getMessage());
+      // Throw StandbyException so that client can retry
+      StandbyException se = new StandbyException(ioe.getMessage());
+      se.initCause(ioe);
+      throw new CompletionException(se);
+    }
   }
 
   public CompletableFuture<Object> invokeAsync(
