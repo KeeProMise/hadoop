@@ -50,6 +50,9 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -60,9 +63,14 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.LongAccumulator;
 import java.util.concurrent.atomic.LongAdder;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javafx.util.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.NameNodeProxiesClient.ProxyAndInfo;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
@@ -514,6 +522,17 @@ public class RouterRpcClient {
       final Class<?> protocol, final Method method, final Object... params)
           throws ConnectException, StandbyException, IOException {
 
+    CompletableFuture<Object> completableFuture =
+        invokeMethodAsync(ugi, namenodes, useObserver, protocol, method, params);
+    try {
+      return completableFuture.get();
+    }catch (ExecutionException e) {
+      IOException ioe = (IOException) e.getCause();
+      throw ioe;
+    }catch (InterruptedException e) {
+
+    }
+
     if (namenodes == null || namenodes.isEmpty()) {
       throw new IOException("No namenodes to invoke " + method.getName() +
           " with params " + Arrays.deepToString(params) + " from "
@@ -656,6 +675,185 @@ public class RouterRpcClient {
     } else {
       throw new StandbyException(msg);
     }
+  }
+
+
+  public CompletableFuture<Object> invokeMethodAsync(
+      final UserGroupInformation ugi,
+      final List<? extends FederationNamenodeContext> namenodes,
+      boolean useObserver,
+      final Class<?> protocol, final Method method, final Object... params)
+      throws ConnectException, StandbyException, IOException {
+
+    if (namenodes == null || namenodes.isEmpty()) {
+      throw new IOException("No namenodes to invoke " + method.getName() +
+          " with params " + Arrays.deepToString(params) + " from "
+          + router.getRouterId());
+    }
+
+    addClientInfoToCallerContext(ugi);
+
+    Object ret = null;
+    if (rpcMonitor != null) {
+      rpcMonitor.proxyOp();
+    }
+
+    Map<FederationNamenodeContext, IOException> ioes = new LinkedHashMap<>();
+
+    CompletableFuture<Object[]> completableFuture =
+        CompletableFuture.completedFuture(new Object[]{useObserver, false, false, null});
+
+    for (FederationNamenodeContext namenode : namenodes) {
+      completableFuture = completableFuture.thenCompose(args -> {
+        Boolean shouldUseObserver = (Boolean) args[0];
+        Boolean failover = (Boolean) args[1];
+        Boolean complete = (Boolean) args[2];
+        if (complete) {
+          return CompletableFuture.completedFuture(
+              new Object[]{shouldUseObserver, failover, complete, args[3]});
+        }
+        return invokeAsyncTask(
+              ugi, namenode, shouldUseObserver, failover, protocol, method, params);
+      });
+    }
+
+    return completableFuture.thenApply(args -> args[3]);
+  }
+
+
+  private CompletableFuture<Object[]> invokeAsyncTask(
+      final UserGroupInformation ugi,
+      FederationNamenodeContext namenode,
+      boolean useObserver,
+      boolean failover,
+      final Class<?> protocol, final Method method, final Object... params) {
+
+    System.out.println("zjtest[" + namenode+"]" + " " + method);
+    if (!useObserver && (namenode.getState() == FederationNamenodeServiceState.OBSERVER)) {
+      return CompletableFuture.completedFuture(new Object[]{useObserver, failover, null});
+    }
+    String nsId = namenode.getNameserviceId();
+    String rpcAddress = namenode.getRpcAddress();
+    return CompletableFuture.supplyAsync(() -> {
+      try {
+        return RouterRpcClient.this.getConnection(ugi, nsId, rpcAddress, protocol);
+      } catch (IOException e) {
+        throw new CompletionException(e);
+      }
+    }).thenCompose((Function<Object, CompletionStage<Object[]>>) con -> {
+      ConnectionContext connection = (ConnectionContext) con;
+      ProxyAndInfo<?> client = connection.getClient();
+      return invokeAsync(nsId, namenode, useObserver, 0, method, client.getProxy(), params)
+          .handle((result, e) -> {
+            connection.release();
+            boolean complete = false;
+            if (result != null || e == null) {
+              complete = true;
+              if (failover &&
+                  FederationNamenodeServiceState.OBSERVER != namenode.getState()) {
+                // Success on alternate server, update
+                InetSocketAddress address = client.getAddress();
+                try {
+                  namenodeResolver.updateActiveNamenode(nsId, address);
+                } catch (IOException ex) {
+                  throw new CompletionException(ex);
+                }
+              }
+              if (this.rpcMonitor != null) {
+                this.rpcMonitor.proxyOpComplete(true, nsId, namenode.getState());
+              }
+              if (this.router.getRouterClientMetrics() != null) {
+                this.router.getRouterClientMetrics().incInvokedMethod(method);
+              }
+              return new Object[] {useObserver, failover, complete, result};
+            }
+            Throwable cause = e.getCause();
+            if (cause instanceof IOException) {
+              IOException ioe = (IOException) cause;
+              if (ioe instanceof ObserverRetryOnActiveException) {
+                LOG.info("Encountered ObserverRetryOnActiveException from {}."
+                    + " Retry active namenode directly.", namenode);
+                return new Object[]{false, failover, complete, null};
+              } else if (ioe instanceof StandbyException) {
+                // Fail over indicated by retry policy and/or NN
+                if (this.rpcMonitor != null) {
+                  this.rpcMonitor.proxyOpFailureStandby(nsId);
+                }
+                return new Object[]{useObserver, true, complete, null};
+              } else if (isUnavailableException(ioe)) {
+                if (this.rpcMonitor != null) {
+                  this.rpcMonitor.proxyOpFailureCommunicate(nsId);
+                }
+                boolean tmpFailover = failover;
+                if (FederationNamenodeServiceState.OBSERVER == namenode.getState()) {
+                  try {
+                    namenodeResolver.updateUnavailableNamenode(nsId,
+                        NetUtils.createSocketAddr(namenode.getRpcAddress()));
+                  } catch (IOException ex) {
+                    throw new CompletionException(ex);
+                  }
+                } else {
+                  tmpFailover = true;
+                }
+                return new Object[]{useObserver, tmpFailover, complete, null};
+              } else if (ioe instanceof RemoteException) {
+                if (this.rpcMonitor != null) {
+                  this.rpcMonitor.proxyOpComplete(true, nsId, namenode.getState());
+                }
+                RemoteException re = (RemoteException) ioe;
+                ioe = re.unwrapRemoteException();
+                ioe = getCleanException(ioe);
+                // RemoteException returned by NN
+                throw new CompletionException(ioe);
+              } else if (ioe instanceof ConnectionNullException) {
+                if (this.rpcMonitor != null) {
+                  this.rpcMonitor.proxyOpFailureCommunicate(nsId);
+                }
+                LOG.error("Get connection for {} {} error: {}", nsId, rpcAddress,
+                    ioe.getMessage());
+                // Throw StandbyException so that client can retry
+                StandbyException se = new StandbyException(ioe.getMessage());
+                se.initCause(ioe);
+                throw new CompletionException(se);
+              } else if (ioe instanceof NoNamenodesAvailableException) {
+                IOException cau = (IOException) ioe.getCause();
+                if (this.rpcMonitor != null) {
+                  this.rpcMonitor.proxyOpNoNamenodes(nsId);
+                }
+                LOG.error("Cannot get available namenode for {} {} error: {}",
+                    nsId, rpcAddress, ioe.getMessage());
+                // Rotate cache so that client can retry the next namenode in the cache
+                if (shouldRotateCache(cau)) {
+                  this.namenodeResolver.rotateCache(nsId, namenode, useObserver);
+                }
+                // Throw RetriableException so that client can retry
+                throw new CompletionException(new RetriableException(ioe));
+              }
+            }else {
+              // Other communication error, this is a failure
+              // Communication retries are handled by the retry policy
+              if (this.rpcMonitor != null) {
+                this.rpcMonitor.proxyOpFailureCommunicate(nsId);
+                this.rpcMonitor.proxyOpComplete(false, nsId, namenode.getState());
+              }
+              throw new CompletionException(cause);
+            }
+            return new Object[]{useObserver, failover, complete, null};
+          });
+    });
+  }
+
+  public CompletableFuture<Object> invokeAsync(
+      String nsId, FederationNamenodeContext namenode, Boolean listObserverFirst,
+      int retryCount, final Method method,
+      final Object obj, final Object... params) {
+    return CompletableFuture.supplyAsync(() -> {
+      try {
+        return invoke(nsId, namenode, listObserverFirst, retryCount, method, obj, params);
+      } catch (IOException e) {
+        throw new CompletionException(e);
+      }
+    });
   }
 
   /**
@@ -1867,5 +2065,11 @@ public class RouterRpcClient {
       ioe = getCleanException(ioe);
     }
     return isUnavailableException(ioe);
+  }
+
+
+  @FunctionalInterface
+  interface ComFunction<T>{
+    T com(Object... o);
   }
 }
