@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.net.SocketFactory;
 
 import org.apache.hadoop.classification.VisibleForTesting;
+import org.apache.hadoop.hdfs.protocolPB.RouterAsyncClientProtocolTranslatorPB;
 import org.apache.hadoop.ipc.AlignmentContext;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -41,7 +42,6 @@ import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocolPB.ClientNamenodeProtocolPB;
-import org.apache.hadoop.hdfs.protocolPB.ClientNamenodeProtocolTranslatorPB;
 import org.apache.hadoop.hdfs.protocolPB.NamenodeProtocolPB;
 import org.apache.hadoop.hdfs.protocolPB.NamenodeProtocolTranslatorPB;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocol;
@@ -117,7 +117,7 @@ public class ConnectionPool {
   static {
     PROTO_MAP.put(ClientProtocol.class,
         new ProtoImpl(ClientNamenodeProtocolPB.class,
-            ClientNamenodeProtocolTranslatorPB.class));
+            RouterAsyncClientProtocolTranslatorPB.class));
     PROTO_MAP.put(NamenodeProtocol.class, new ProtoImpl(
         NamenodeProtocolPB.class, NamenodeProtocolTranslatorPB.class));
     PROTO_MAP.put(RefreshUserMappingsProtocol.class,

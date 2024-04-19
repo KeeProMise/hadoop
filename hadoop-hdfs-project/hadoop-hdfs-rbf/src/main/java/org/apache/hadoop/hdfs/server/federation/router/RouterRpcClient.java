@@ -883,7 +883,10 @@ public class RouterRpcClient {
       final CallerContext callerContext,
       String nsId, FederationNamenodeContext namenode, Boolean listObserverFirst,
       int retryCount, final Method method,
-      final Object obj, final Object... params) {
+      final Object obj, final Object... params) throws IOException {
+//    transferThreadLocalContext(originCall, callerContext);
+//    invoke(nsId, namenode, listObserverFirst, retryCount, method, obj, params);
+//    return ClientNamenodeProtocolTranslatorPB.getCompletableFuture();
     return CompletableFuture.supplyAsync(() -> {
       try {
         transferThreadLocalContext(originCall, callerContext);
