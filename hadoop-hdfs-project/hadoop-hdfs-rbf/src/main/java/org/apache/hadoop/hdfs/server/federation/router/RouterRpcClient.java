@@ -697,6 +697,9 @@ public class RouterRpcClient {
     }
 
     addClientInfoToCallerContext(ugi);
+    if (rpcMonitor != null) {
+      rpcMonitor.proxyOp();
+    }
     // transfer originCall & callerContext to worker threads of executor.
     final Call originCall = Server.getCurCall().get();
     final CallerContext originContext = CallerContext.getCurrent();

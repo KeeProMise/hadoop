@@ -353,10 +353,6 @@ public class RouterAsyncClientProtocolTranslatorPB extends ClientNamenodeProtoco
       ShadedProtobufHelper.IpcCall<T> call) throws IOException {
     CompletableFuture<Object> completableFuture = new CompletableFuture<>();
     Client.COMPLETABLE_FUTURE_THREAD_LOCAL.set(completableFuture);
-    final Server.Call originCall = Server.getCurCall().get();
-    final CallerContext originContext = CallerContext.getCurrent();
-    System.out.println(this + "zjtest originCall  " + originCall);
-    System.out.println(this + "zjtest originContext  " + originContext);
     ipc(call);
     return (AsyncGet<T, Exception>)ProtobufRpcEngine2.getAsyncReturnMessage();
   }
