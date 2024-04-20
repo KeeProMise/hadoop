@@ -391,8 +391,13 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
     }
 
     // Create the client
-    this.rpcClient = new RouterRpcClient(this.conf, this.router,
-        this.namenodeResolver, this.rpcMonitor, routerStateIdContext);
+    if (router.isEnableAsync()) {
+      this.rpcClient = new RouterAsyncRpcClient(this.conf, this.router,
+          this.namenodeResolver, this.rpcMonitor, routerStateIdContext);
+    } else {
+      this.rpcClient = new RouterRpcClient(this.conf, this.router,
+          this.namenodeResolver, this.rpcMonitor, routerStateIdContext);
+    }
 
     // Initialize modules
     this.quotaCall = new Quota(this.router, this);
