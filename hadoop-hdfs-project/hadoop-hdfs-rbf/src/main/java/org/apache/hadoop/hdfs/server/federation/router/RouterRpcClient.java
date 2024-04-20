@@ -74,8 +74,10 @@ import javafx.util.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.NameNodeProxiesClient.ProxyAndInfo;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
+import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.SnapshotException;
+import org.apache.hadoop.hdfs.protocolPB.RouterAsyncClientProtocolTranslatorPB;
 import org.apache.hadoop.hdfs.server.federation.fairness.RouterRpcFairnessPolicyController;
 import org.apache.hadoop.hdfs.server.federation.resolver.ActiveNamenodeResolver;
 import org.apache.hadoop.hdfs.server.federation.resolver.FederationNamenodeContext;
@@ -86,6 +88,7 @@ import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
 import org.apache.hadoop.ipc.CallerContext;
+import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.ObserverRetryOnActiveException;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.RetriableException;
@@ -95,6 +98,7 @@ import org.apache.hadoop.ipc.StandbyException;
 import org.apache.hadoop.net.ConnectTimeoutException;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.thirdparty.org.checkerframework.checker.units.qual.C;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.eclipse.jetty.util.ajax.JSON;
@@ -522,15 +526,16 @@ public class RouterRpcClient {
       final Class<?> protocol, final Method method, final Object... params)
           throws ConnectException, StandbyException, IOException {
 
-    CompletableFuture<Object> completableFuture =
-        invokeMethodAsync(ugi, namenodes, useObserver, protocol, method, params);
-    try {
-      return completableFuture.get();
-    }catch (ExecutionException e) {
-      IOException ioe = (IOException) e.getCause();
-      throw ioe;
-    }catch (InterruptedException e) {
-
+    if (protocol.getName().equals(ClientProtocol.class.getName())) {
+      CompletableFuture<Object> completableFuture =
+          invokeMethodAsync(ugi, namenodes, useObserver, protocol, method, params);
+      try {
+        return completableFuture.get();
+      }catch (ExecutionException e) {
+        IOException ioe = (IOException) e.getCause();
+        throw ioe;
+      }catch (InterruptedException e) {
+      }
     }
 
     if (namenodes == null || namenodes.isEmpty()) {
@@ -699,8 +704,9 @@ public class RouterRpcClient {
     final long startProxyTime = Time.monotonicNow();
     Map<FederationNamenodeContext, IOException> ioes = new LinkedHashMap<>();
 
-    CompletableFuture<Object[]> completableFuture =
-        CompletableFuture.completedFuture(new Object[]{useObserver, false, false, null});
+    CompletableFuture<Object[]> completableFuture = CompletableFuture.supplyAsync(
+        () -> new Object[]{useObserver, false, false, null},
+        RouterAsyncClientProtocolTranslatorPB.getExecutor());
 
     for (FederationNamenodeContext namenode : namenodes) {
       completableFuture = completableFuture.thenCompose(args -> {
@@ -770,6 +776,7 @@ public class RouterRpcClient {
     String nsId = namenode.getNameserviceId();
     String rpcAddress = namenode.getRpcAddress();
     try {
+      transferThreadLocalContext(originCall, callerContext);
       ConnectionContext connection = getConnection(ugi, nsId, rpcAddress, protocol);
       ProxyAndInfo<?> client = connection.getClient();
       return invokeAsync(originCall, callerContext, nsId, namenode, useObserver,
@@ -878,25 +885,6 @@ public class RouterRpcClient {
     }
   }
 
-  public CompletableFuture<Object> invokeAsync(
-      final Call originCall,
-      final CallerContext callerContext,
-      String nsId, FederationNamenodeContext namenode, Boolean listObserverFirst,
-      int retryCount, final Method method,
-      final Object obj, final Object... params) throws IOException {
-//    transferThreadLocalContext(originCall, callerContext);
-//    invoke(nsId, namenode, listObserverFirst, retryCount, method, obj, params);
-//    return ClientNamenodeProtocolTranslatorPB.getCompletableFuture();
-    return CompletableFuture.supplyAsync(() -> {
-      try {
-        transferThreadLocalContext(originCall, callerContext);
-        return invoke(nsId, namenode, listObserverFirst, retryCount, method, obj, params);
-      } catch (IOException e) {
-        throw new CompletionException(e);
-      }
-    });
-  }
-
   /**
    * For tracking some information about the actual client.
    * It adds trace info "clientIp:ip", "clientPort:port",
@@ -991,6 +979,72 @@ public class RouterRpcClient {
       } else {
         throw new IOException(e);
       }
+    }
+  }
+
+  public CompletableFuture<Object> invokeAsync(
+      final Call originCall,
+      final CallerContext callerContext,
+      String nsId, FederationNamenodeContext namenode, Boolean listObserverFirst,
+      int retryCount, final Method method,
+      final Object obj, final Object... params) {
+    try {
+      transferThreadLocalContext(originCall, callerContext);
+      Client.setAsynchronousMode(true);
+      method.invoke(obj, params);
+      CompletableFuture<Object> completableFuture =
+          RouterAsyncClientProtocolTranslatorPB.getCompletableFuture();
+
+      return completableFuture.handle((BiFunction<Object, Throwable, Object>) (result, e) -> {
+        if (e == null) {
+          return new Object[]{result, true};
+        }
+
+        Throwable cause = e.getCause();
+        if (cause instanceof IOException) {
+          IOException ioe = (IOException) cause;
+
+          // Check if we should retry.
+          RetryDecision decision = null;
+          try {
+            decision = shouldRetry(ioe, retryCount, nsId, namenode, listObserverFirst);
+          } catch (IOException ex) {
+            throw new CompletionException(ex);
+          }
+          if (decision == RetryDecision.RETRY) {
+            if (RouterRpcClient.this.rpcMonitor != null) {
+              RouterRpcClient.this.rpcMonitor.proxyOpRetries();
+            }
+            // retry
+            return new Object[]{result, false};
+          } else if (decision == RetryDecision.FAILOVER_AND_RETRY) {
+            // failover, invoker looks for standby exceptions for failover.
+            if (ioe instanceof StandbyException) {
+              throw new CompletionException(ioe);
+            } else if (isUnavailableException(ioe)) {
+              throw new CompletionException(ioe);
+            } else {
+              throw new CompletionException(new StandbyException(ioe.getMessage()));
+            }
+          } else {
+            throw new CompletionException(ioe);
+          }
+        } else {
+          throw new CompletionException(new IOException(e));
+        }
+      }).thenCompose(o -> {
+        Object[] args = (Object[]) o;
+        boolean complete = (boolean) args[1];
+        if (complete) {
+          return CompletableFuture.completedFuture(args[0]);
+        }
+        return invokeAsync(originCall, callerContext, nsId, namenode,
+            listObserverFirst, retryCount + 1, method, obj, params);
+      });
+    } catch (InvocationTargetException e) {
+      throw new CompletionException(e.getCause());
+    } catch (Exception e) {
+      throw new CompletionException(e);
     }
   }
 
@@ -2106,11 +2160,5 @@ public class RouterRpcClient {
       ioe = getCleanException(ioe);
     }
     return isUnavailableException(ioe);
-  }
-
-
-  @FunctionalInterface
-  interface ComFunction<T>{
-    T com(Object... o);
   }
 }

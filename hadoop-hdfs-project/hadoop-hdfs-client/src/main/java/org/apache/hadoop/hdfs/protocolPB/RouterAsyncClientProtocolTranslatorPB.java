@@ -27,6 +27,8 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -307,14 +309,13 @@ import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifie
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
 import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.retry.AsyncCallHandler;
+import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.ProtobufRpcEngine2;
-import org.apache.hadoop.ipc.ProtocolMetaInterface;
-import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.RpcClientUtil;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ipc.internal.ShadedProtobufHelper;
 import org.apache.hadoop.security.proto.SecurityProtos;
 import org.apache.hadoop.security.proto.SecurityProtos.CancelDelegationTokenRequestProto;
@@ -324,7 +325,6 @@ import org.apache.hadoop.security.proto.SecurityProtos.RenewDelegationTokenReque
 import org.apache.hadoop.security.token.Token;
 
 import org.apache.hadoop.thirdparty.protobuf.ByteString;
-import org.apache.hadoop.thirdparty.protobuf.Message;
 import org.apache.hadoop.thirdparty.protobuf.ServiceException;
 
 import org.apache.hadoop.util.Lists;
@@ -343,7 +343,7 @@ import static org.apache.hadoop.ipc.internal.ShadedProtobufHelper.ipc;
 public class RouterAsyncClientProtocolTranslatorPB extends ClientNamenodeProtocolTranslatorPB {
   public static final ThreadLocal<CompletableFuture<Object>> completableFutureThreadLocal
       = new ThreadLocal<>();
-  private Executor executor;
+  private static volatile Executor executor;
 
   public RouterAsyncClientProtocolTranslatorPB(ClientNamenodeProtocolPB proxy) {
     super(proxy);
@@ -351,9 +351,13 @@ public class RouterAsyncClientProtocolTranslatorPB extends ClientNamenodeProtoco
 
   private  <T> AsyncGet<T, Exception> asyncIpc(
       ShadedProtobufHelper.IpcCall<T> call) throws IOException {
-    ipc(call);
     CompletableFuture<Object> completableFuture = new CompletableFuture<>();
     Client.COMPLETABLE_FUTURE_THREAD_LOCAL.set(completableFuture);
+    final Server.Call originCall = Server.getCurCall().get();
+    final CallerContext originContext = CallerContext.getCurrent();
+    System.out.println(this + "zjtest originCall  " + originCall);
+    System.out.println(this + "zjtest originContext  " + originContext);
+    ipc(call);
     return (AsyncGet<T, Exception>)ProtobufRpcEngine2.getAsyncReturnMessage();
   }
 
@@ -367,7 +371,7 @@ public class RouterAsyncClientProtocolTranslatorPB extends ClientNamenodeProtoco
       }catch (Exception e) {
         throw new CompletionException(e);
       }
-    }, executor);
+    }, getExecutor());
     setThreadLocal(resCompletableFuture);
   }
 
@@ -377,6 +381,18 @@ public class RouterAsyncClientProtocolTranslatorPB extends ClientNamenodeProtoco
 
   public static CompletableFuture<Object> getCompletableFuture() {
     return completableFutureThreadLocal.get();
+  }
+
+  public static Executor getExecutor() {
+    if (executor == null) {
+      synchronized (RouterAsyncClientProtocolTranslatorPB.class) {
+        if (executor == null) {
+          executor = Executors.newFixedThreadPool(100);
+        }
+        return executor;
+      }
+    }
+    return executor;
   }
 
   @Override
@@ -418,7 +434,7 @@ public class RouterAsyncClientProtocolTranslatorPB extends ClientNamenodeProtoco
           = asyncIpc(() -> rpcProxy.getServerDefaults(null, req));
     asyncResponse(() ->
           PBHelperClient.convert(asyncGet.get(-1, null).getServerDefaults()));
-      return null;
+    return null;
   }
 
   @Override
@@ -557,10 +573,12 @@ public class RouterAsyncClientProtocolTranslatorPB extends ClientNamenodeProtoco
 
     SetOwnerRequestProto.Builder req = SetOwnerRequestProto.newBuilder()
         .setSrc(src);
-    if (username != null)
+    if (username != null) {
       req.setUsername(username);
-    if (groupname != null)
+    }
+    if (groupname != null) {
       req.setGroupname(groupname);
+    }
 
     AsyncGet<SetOwnerResponseProto, Exception> asyncGet
         = asyncIpc(() -> rpcProxy.setOwner(null, req.build()));
@@ -593,10 +611,12 @@ public class RouterAsyncClientProtocolTranslatorPB extends ClientNamenodeProtoco
     }
     AddBlockRequestProto.Builder req = AddBlockRequestProto.newBuilder()
         .setSrc(src).setClientName(clientName).setFileId(fileId);
-    if (previous != null)
+    if (previous != null) {
       req.setPrevious(PBHelperClient.convert(previous));
-    if (excludeNodes != null)
+    }
+    if (excludeNodes != null) {
       req.addAllExcludeNodes(PBHelperClient.convert(excludeNodes));
+    }
     if (favoredNodes != null) {
       req.addAllFavoredNodes(Arrays.asList(favoredNodes));
     }
@@ -650,8 +670,9 @@ public class RouterAsyncClientProtocolTranslatorPB extends ClientNamenodeProtoco
         .setSrc(src)
         .setClientName(clientName)
         .setFileId(fileId);
-    if (last != null)
+    if (last != null) {
       req.setLast(PBHelperClient.convert(last));
+    }
 
     AsyncGet<CompleteResponseProto, Exception> asyncGet
         = asyncIpc(() -> rpcProxy.complete(null, req.build()));
@@ -963,7 +984,8 @@ public class RouterAsyncClientProtocolTranslatorPB extends ClientNamenodeProtoco
     if (Client.isAsynchronousMode()) {
       AsyncGet<GetDatanodeReportResponseProto, Exception> asyncGet
           = asyncIpc(() -> rpcProxy.getDatanodeReport(null, req));
-      asyncResponse(() -> asyncGet.get(-1, null).getDiList());
+      asyncResponse(() ->
+          PBHelperClient.convert(asyncGet.get(-1, null).getDiList()));
       return null;
     }
     return PBHelperClient.convert(
@@ -1715,6 +1737,7 @@ public class RouterAsyncClientProtocolTranslatorPB extends ClientNamenodeProtoco
       AsyncGet<AddCacheDirectiveResponseProto, Exception> asyncGet
           = asyncIpc(() -> rpcProxy.addCacheDirective(null, builder.build()));
       asyncResponse(() -> asyncGet.get(-1, null).getId());
+      return -1;
     }
     return ipc(() -> rpcProxy.addCacheDirective(null, builder.build())).getId();
   }
