@@ -47,16 +47,27 @@ import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
+
+import static org.apache.hadoop.hdfs.server.federation.fairness.RouterRpcFairnessConstants.CONCURRENT_NS;
+import static org.apache.hadoop.hdfs.server.federation.metrics.FederationRPCPerformanceMonitor.CONCURRENT;
 
 public class RouterAsyncRpcClient extends RouterRpcClient{
   private static final Logger LOG =
@@ -492,5 +503,180 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
     }catch (IOException ioe) {
       throw new CompletionException(ioe);
     }
+  }
+
+  public <T extends RemoteLocationContext, R> Map<T, R> invokeConcurrent(
+      final Collection<T> locations, final RemoteMethod method,
+      boolean requireResponse, boolean standby, long timeOutMs, Class<R> clazz)
+      throws IOException {
+    final List<RemoteResult<T, R>> results = invokeConcurrent(
+        locations, method, standby, timeOutMs, clazz);
+
+    // Go over the results and exceptions
+    final Map<T, R> ret = new TreeMap<>();
+    final List<IOException> thrownExceptions = new ArrayList<>();
+    IOException firstUnavailableException = null;
+    for (final RemoteResult<T, R> result : results) {
+      if (result.hasException()) {
+        IOException ioe = result.getException();
+        thrownExceptions.add(ioe);
+        // Track unavailable exceptions to throw them first
+        if (isUnavailableException(ioe)) {
+          firstUnavailableException = ioe;
+        }
+      }
+      if (result.hasResult()) {
+        ret.put(result.getLocation(), result.getResult());
+      }
+    }
+
+    // Throw exceptions if needed
+    if (!thrownExceptions.isEmpty()) {
+      // Throw if response from all servers required or no results
+      if (requireResponse || ret.isEmpty()) {
+        // Throw unavailable exceptions first
+        if (firstUnavailableException != null) {
+          throw firstUnavailableException;
+        } else {
+          throw thrownExceptions.get(0);
+        }
+      }
+    }
+
+    return ret;
+  }
+
+  @SuppressWarnings("checkstyle:MethodLength")
+  public <T extends RemoteLocationContext, R> List<RemoteResult<T, R>>
+      invokeConcurrent(final Collection<T> locations,
+                   final RemoteMethod method, boolean standby, long timeOutMs,
+                   Class<R> clazz) throws IOException {
+
+    if (!method.getProtocol().getName().equals(ClientProtocol.class.getName())) {
+      return super.invokeConcurrent(locations, method, standby, timeOutMs, clazz);
+    }
+
+    final UserGroupInformation ugi = RouterRpcServer.getRemoteUser();
+    final Method m = method.getMethod();
+
+    if (locations.isEmpty()) {
+      throw new IOException("No remote locations available");
+    } else if (locations.size() == 1 && timeOutMs <= 0) {
+      // Shortcut, just one call
+      T location = locations.iterator().next();
+      String ns = location.getNameserviceId();
+      boolean isObserverRead = isObserverReadEligible(ns, m);
+      final List<? extends FederationNamenodeContext> namenodes =
+          getOrderedNamenodes(ns, isObserverRead);
+      RouterRpcFairnessPolicyController controller = getRouterRpcFairnessPolicyController();
+      acquirePermit(ns, ugi, method, controller);
+      try {
+        Class<?> proto = method.getProtocol();
+        Object[] paramList = method.getParams(location);
+        invokeMethod(ugi, namenodes, isObserverRead, proto, m, paramList);
+        CompletableFuture<Object> completableFuture = CUR_COMPLETABLE_FUTURE.get();
+        completableFuture = completableFuture.exceptionally(e -> {
+          IOException ioe = (IOException) e.getCause();
+          throw new CompletionException(processException(ioe, location));
+        }).thenApply(result -> {
+          RemoteResult<T, R> remoteResult =
+              (RemoteResult<T, R>) new RemoteResult<>(location, result);
+          return Collections.singletonList(remoteResult);
+        });
+        CUR_COMPLETABLE_FUTURE.set(completableFuture);
+        return (List<RemoteResult<T, R>>) getResult();
+      } catch (IOException ioe) {
+        // Localize the exception
+        throw processException(ioe, location);
+      } finally {
+        releasePermit(ns, ugi, method, controller);
+      }
+    }
+
+    if (rpcMonitor != null) {
+      rpcMonitor.proxyOp();
+    }
+    if (this.router.getRouterClientMetrics() != null) {
+      this.router.getRouterClientMetrics().incInvokedConcurrent(m);
+    }
+
+    RouterRpcFairnessPolicyController controller = getRouterRpcFairnessPolicyController();
+    acquirePermit(CONCURRENT_NS, ugi, method, controller);
+
+    List<T> orderedLocations = new ArrayList<>();
+    List<CompletableFuture<Object>> completableFutures = new ArrayList<>();
+    for (final T location : locations) {
+      String nsId = location.getNameserviceId();
+      boolean isObserverRead = isObserverReadEligible(nsId, m);
+      final List<? extends FederationNamenodeContext> namenodes =
+          getOrderedNamenodes(nsId, isObserverRead);
+      final Class<?> proto = method.getProtocol();
+      final Object[] paramList = method.getParams(location);
+      if (standby) {
+        // Call the objectGetter to all NNs (including standby)
+        for (final FederationNamenodeContext nn : namenodes) {
+          final List<FederationNamenodeContext> nnList =
+              Collections.singletonList(nn);
+          String nnId = nn.getNamenodeId();
+          T nnLocation = location;
+          if (location instanceof RemoteLocation) {
+            nnLocation = (T)new RemoteLocation(nsId, nnId, location.getDest());
+          }
+          orderedLocations.add(nnLocation);
+          invokeMethod(ugi, nnList, isObserverRead, proto, m, paramList);
+          completableFutures.add(CUR_COMPLETABLE_FUTURE.get());
+        }
+      } else {
+        // Call the objectGetter in order of nameservices in the NS list
+        orderedLocations.add(location);
+        invokeMethod(ugi, namenodes, isObserverRead, proto, m, paramList);
+        completableFutures.add(CUR_COMPLETABLE_FUTURE.get());
+      }
+    }
+
+    CompletableFuture<Object>[] completableFuturesArray =
+        new CompletableFuture[completableFutures.size()];
+    completableFuturesArray = completableFutures.toArray(completableFuturesArray);
+    CompletableFuture<Void> allFuture = CompletableFuture.allOf(completableFuturesArray);
+    CompletableFuture<Object> resultCompletable = allFuture.handle((unused, throwable) -> {
+      List<RemoteResult<T, R>> results = new ArrayList<>();
+      for (int i=0; i<completableFutures.size(); i++) {
+        T location = orderedLocations.get(i);
+        CompletableFuture<Object> resultFuture = completableFutures.get(i);
+        Object result = null;
+        try {
+          result = resultFuture.get();
+          results.add((RemoteResult<T, R>) new RemoteResult<>(location, result));
+        } catch (InterruptedException ignored) {
+        } catch (ExecutionException e) {
+          Throwable cause = e.getCause();
+          IOException ioe = null;
+          if (cause instanceof CancellationException) {
+            T loc = orderedLocations.get(i);
+            String msg = "Invocation to \"" + loc + "\" for \""
+                + method.getMethodName() + "\" timed out";
+            LOG.error(msg);
+            ioe = new SubClusterTimeoutException(msg);
+          } else if (cause instanceof IOException) {
+            LOG.debug("Cannot execute {} in {}: {}",
+                m.getName(), location, cause.getMessage());
+            ioe = (IOException) cause;
+          } else {
+            ioe = new IOException("Unhandled exception while proxying API " +
+                m.getName() + ": " + cause.getMessage(), cause);
+          }
+          // Store the exceptions
+          results.add(new RemoteResult<>(location, ioe));
+        }
+      }
+      if (rpcMonitor != null) {
+        rpcMonitor.proxyOpComplete(true, CONCURRENT, null);
+      }
+      return results;
+    });
+
+    CUR_COMPLETABLE_FUTURE.set(resultCompletable);
+    releasePermit(CONCURRENT_NS, ugi, method, controller);
+    return (List<RemoteResult<T, R>>) getResult();
   }
 }
