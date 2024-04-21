@@ -968,12 +968,7 @@ public class RouterRpcClient {
       Class<?> proto = method.getProtocol();
       Method m = method.getMethod();
       Object[] params = method.getParams(loc);
-      Object o = invokeMethod(ugi, nns, isObserverRead, proto, m, params);
-      if (!proto.getName().equals(ClientProtocol.class.getName())) {
-        return o;
-      }else {
-        return getResult();
-      }
+      return invokeMethod(ugi, nns, isObserverRead, proto, m, params);
     } finally {
       releasePermit(nsId, ugi, method, controller);
     }

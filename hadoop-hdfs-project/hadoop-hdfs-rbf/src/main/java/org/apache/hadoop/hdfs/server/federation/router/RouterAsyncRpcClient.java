@@ -53,18 +53,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
-import java.util.function.Function;
-import java.util.function.Supplier;
 
 import static org.apache.hadoop.hdfs.server.federation.fairness.RouterRpcFairnessConstants.CONCURRENT_NS;
 import static org.apache.hadoop.hdfs.server.federation.metrics.FederationRPCPerformanceMonitor.CONCURRENT;
@@ -315,7 +308,7 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
 
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  public CompletableFuture<Object> invokeAsync(
+  private CompletableFuture<Object> invokeAsync(
       final Server.Call originCall,
       final CallerContext callerContext,
       String nsId, FederationNamenodeContext namenode,
@@ -505,53 +498,72 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
     }
   }
 
+  @Override
   public <T extends RemoteLocationContext, R> Map<T, R> invokeConcurrent(
       final Collection<T> locations, final RemoteMethod method,
       boolean requireResponse, boolean standby, long timeOutMs, Class<R> clazz)
       throws IOException {
-    final List<RemoteResult<T, R>> results = invokeConcurrent(
-        locations, method, standby, timeOutMs, clazz);
-
-    // Go over the results and exceptions
-    final Map<T, R> ret = new TreeMap<>();
-    final List<IOException> thrownExceptions = new ArrayList<>();
-    IOException firstUnavailableException = null;
-    for (final RemoteResult<T, R> result : results) {
-      if (result.hasException()) {
-        IOException ioe = result.getException();
-        thrownExceptions.add(ioe);
-        // Track unavailable exceptions to throw them first
-        if (isUnavailableException(ioe)) {
-          firstUnavailableException = ioe;
+    if (!method.getProtocol().getName().equals(ClientProtocol.class.getName())) {
+      return super.invokeConcurrent(locations, method, requireResponse,
+          standby, timeOutMs, clazz);
+    }
+    invokeConcurrentAsync(locations, method, standby, timeOutMs, clazz);
+    CompletableFuture<Object> completableFuture = CUR_COMPLETABLE_FUTURE.get();
+    completableFuture =  completableFuture.thenApply(o -> {
+      final List<RemoteResult<T, R>> results = (List<RemoteResult<T, R>>) o;
+      // Go over the results and exceptions
+      final Map<T, R> ret = new TreeMap<>();
+      final List<IOException> thrownExceptions = new ArrayList<>();
+      IOException firstUnavailableException = null;
+      for (final RemoteResult<T, R> result : results) {
+        if (result.hasException()) {
+          IOException ioe = result.getException();
+          thrownExceptions.add(ioe);
+          // Track unavailable exceptions to throw them first
+          if (isUnavailableException(ioe)) {
+            firstUnavailableException = ioe;
+          }
+        }
+        if (result.hasResult()) {
+          ret.put(result.getLocation(), result.getResult());
         }
       }
-      if (result.hasResult()) {
-        ret.put(result.getLocation(), result.getResult());
-      }
-    }
-
-    // Throw exceptions if needed
-    if (!thrownExceptions.isEmpty()) {
-      // Throw if response from all servers required or no results
-      if (requireResponse || ret.isEmpty()) {
-        // Throw unavailable exceptions first
-        if (firstUnavailableException != null) {
-          throw firstUnavailableException;
-        } else {
-          throw thrownExceptions.get(0);
+      // Throw exceptions if needed
+      if (!thrownExceptions.isEmpty()) {
+        // Throw if response from all servers required or no results
+        if (requireResponse || ret.isEmpty()) {
+          // Throw unavailable exceptions first
+          if (firstUnavailableException != null) {
+            throw new CompletionException(firstUnavailableException);
+          } else {
+            throw new CompletionException(thrownExceptions.get(0));
+          }
         }
       }
-    }
-
-    return ret;
+      return ret;
+    });
+    CUR_COMPLETABLE_FUTURE.set(completableFuture);
+    return (Map<T, R>) getResult();
   }
 
+  @Override
   @SuppressWarnings("checkstyle:MethodLength")
   public <T extends RemoteLocationContext, R> List<RemoteResult<T, R>>
       invokeConcurrent(final Collection<T> locations,
                    final RemoteMethod method, boolean standby, long timeOutMs,
                    Class<R> clazz) throws IOException {
 
+    if (!method.getProtocol().getName().equals(ClientProtocol.class.getName())) {
+      return super.invokeConcurrent(locations, method, standby, timeOutMs, clazz);
+    }
+    invokeConcurrentAsync(locations, method, standby, timeOutMs, clazz);
+    return (List<RemoteResult<T, R>>) getResult();
+  }
+
+  private  <T extends RemoteLocationContext, R> List<RemoteResult<T, R>>
+      invokeConcurrentAsync(final Collection<T> locations,
+                   final RemoteMethod method, boolean standby, long timeOutMs,
+                   Class<R> clazz) throws IOException {
     if (!method.getProtocol().getName().equals(ClientProtocol.class.getName())) {
       return super.invokeConcurrent(locations, method, standby, timeOutMs, clazz);
     }
@@ -584,7 +596,7 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
           return Collections.singletonList(remoteResult);
         });
         CUR_COMPLETABLE_FUTURE.set(completableFuture);
-        return (List<RemoteResult<T, R>>) getResult();
+        return null;
       } catch (IOException ioe) {
         // Localize the exception
         throw processException(ioe, location);
@@ -677,6 +689,16 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
 
     CUR_COMPLETABLE_FUTURE.set(resultCompletable);
     releasePermit(CONCURRENT_NS, ugi, method, controller);
-    return (List<RemoteResult<T, R>>) getResult();
+    return null;
+  }
+
+  @Override
+  public Object invokeSingle(final String nsId, RemoteMethod method)
+      throws IOException {
+    Object result = super.invokeSingle(nsId, method);
+    if (!method.getProtocol().getName().equals(ClientProtocol.class.getName())) {
+      return result;
+    }
+    return getResult();
   }
 }
