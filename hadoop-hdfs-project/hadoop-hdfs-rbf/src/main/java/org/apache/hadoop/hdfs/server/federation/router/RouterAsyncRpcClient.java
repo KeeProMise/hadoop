@@ -21,9 +21,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.NameNodeProxiesClient;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocolPB.RouterAsyncClientProtocolTranslatorPB;
+import org.apache.hadoop.hdfs.server.federation.fairness.RouterRpcFairnessPolicyController;
 import org.apache.hadoop.hdfs.server.federation.resolver.ActiveNamenodeResolver;
 import org.apache.hadoop.hdfs.server.federation.resolver.FederationNamenodeContext;
 import org.apache.hadoop.hdfs.server.federation.resolver.FederationNamenodeServiceState;
+import org.apache.hadoop.hdfs.server.federation.resolver.RemoteLocation;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.ipc.Client;
@@ -43,18 +45,25 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 public class RouterAsyncRpcClient extends RouterRpcClient{
   private static final Logger LOG =
       LoggerFactory.getLogger(RouterAsyncRpcClient.class);
+
+  public static final ThreadLocal<CompletableFuture<Object>> CUR_COMPLETABLE_FUTURE
+      = new ThreadLocal<>();
 
   /**
    * Create a router RPC client to manage remote procedure calls to NNs.
@@ -78,16 +87,12 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
       List<? extends FederationNamenodeContext> namenodes,
       boolean useObserver, Class<?> protocol,
       Method method, Object... params) throws IOException {
+    LOG.info("zj test : {}, {}, {}, {}", method.getName(), useObserver, namenodes.toString());
     if (protocol.getName().equals(ClientProtocol.class.getName())) {
       CompletableFuture<Object> completableFuture =
           invokeMethodAsync(ugi, namenodes, useObserver, protocol, method, params);
-      try {
-        return completableFuture.get();
-      }catch (ExecutionException e) {
-        IOException ioe = (IOException) e.getCause();
-        throw ioe;
-      }catch (InterruptedException e) {
-      }
+      CUR_COMPLETABLE_FUTURE.set(completableFuture);
+      return completableFuture;
     }
     return super.invokeMethod(ugi, namenodes, useObserver, protocol, method, params);
   }
@@ -182,14 +187,13 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
       boolean useObserver,
       boolean failover,
       final Class<?> protocol, final Method method, final Object... params) {
-
+    transferThreadLocalContext(originCall, callerContext);
     if (!useObserver && (namenode.getState() == FederationNamenodeServiceState.OBSERVER)) {
       return CompletableFuture.completedFuture(new Object[]{useObserver, failover, false, null});
     }
     String nsId = namenode.getNameserviceId();
     String rpcAddress = namenode.getRpcAddress();
     try {
-      transferThreadLocalContext(originCall, callerContext);
       ConnectionContext connection = getConnection(ugi, nsId, rpcAddress, protocol);
       NameNodeProxiesClient.ProxyAndInfo<?> client = connection.getClient();
       return invokeAsync(originCall, callerContext, nsId, namenode, useObserver,
@@ -364,6 +368,129 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
       throw new CompletionException(e.getCause());
     } catch (Exception e) {
       throw new CompletionException(e);
+    }
+  }
+
+  @Override
+  public <R extends RemoteLocationContext, T> RemoteResult invokeSequential(
+      final RemoteMethod remoteMethod, final List<R> locations,
+      Class<T> expectedResultClass, Object expectedResultValue)
+      throws IOException {
+    Class<?> proto = remoteMethod.getProtocol();
+    if (!proto.getName().equals(ClientProtocol.class.getName())) {
+      return super.invokeSequential(
+          remoteMethod, locations, expectedResultClass, expectedResultValue);
+    }
+
+    RouterRpcFairnessPolicyController controller = getRouterRpcFairnessPolicyController();
+    final UserGroupInformation ugi = RouterRpcServer.getRemoteUser();
+    final Method m = remoteMethod.getMethod();
+    List<IOException> thrownExceptions = new ArrayList<>();
+    List<Object> results = new ArrayList<>();
+    CompletableFuture<Object[]> completableFuture =
+        CompletableFuture.completedFuture(new Object[] {null, false});
+    System.out.println("zjcom1: " + completableFuture);
+    final Server.Call originCall = Server.getCurCall().get();
+    final CallerContext originContext = CallerContext.getCurrent();
+    // Invoke in priority order
+    for (final RemoteLocationContext loc : locations) {
+      String ns = loc.getNameserviceId();
+      acquirePermit(ns, ugi, remoteMethod, controller);
+      completableFuture = completableFuture.thenComposeAsync(args -> {
+        boolean complete = (boolean) args[1];
+        if (complete) {
+          return CompletableFuture.completedFuture(new Object[]{args[0], true});
+        }
+        return invokeSequentialToOneNs(originCall, originContext, ugi, m,
+            thrownExceptions, remoteMethod, loc, expectedResultClass,
+            expectedResultValue, results);
+      }, RouterAsyncClientProtocolTranslatorPB.getExecutor());
+
+      releasePermit(ns, ugi, remoteMethod, controller);
+    }
+
+    CompletableFuture<Object> resultFuture = completableFuture.thenApply(args -> {
+      boolean complete = (boolean) args[1];
+      if (complete) {
+        return args[0];
+      }
+      if (!thrownExceptions.isEmpty()) {
+        // An unavailable subcluster may be the actual cause
+        // We cannot surface other exceptions (e.g., FileNotFoundException)
+        for (int i = 0; i < thrownExceptions.size(); i++) {
+          IOException ioe = thrownExceptions.get(i);
+          if (isUnavailableException(ioe)) {
+            throw new CompletionException(ioe);
+          }
+        }
+
+        // re-throw the first exception thrown for compatibility
+        throw new CompletionException(thrownExceptions.get(0));
+      }
+      // Return the first result, whether it is the value or not
+      return new RemoteResult<>(locations.get(0), results.get(0));
+    });
+    System.out.println("zjcom2: " + resultFuture);
+    CUR_COMPLETABLE_FUTURE.set(resultFuture);
+    return (RemoteResult) getResult();
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  private CompletableFuture<Object[]> invokeSequentialToOneNs(
+      final Server.Call originCall, final CallerContext originContext,
+      final UserGroupInformation ugi, final Method m,
+      final List<IOException> thrownExceptions,
+      final RemoteMethod remoteMethod, final RemoteLocationContext loc,
+      final Class expectedResultClass, final Object expectedResultValue,
+      final List<Object> results) {
+    transferThreadLocalContext(originCall, originContext);
+    String ns = loc.getNameserviceId();
+    boolean isObserverRead = isObserverReadEligible(ns, m);
+    try {
+      List<? extends FederationNamenodeContext> namenodes =
+          getOrderedNamenodes(ns, isObserverRead);
+      Class<?> proto = remoteMethod.getProtocol();
+      Object[] params = remoteMethod.getParams(loc);
+
+      CompletableFuture<Object> completableFuture =
+          (CompletableFuture<Object>) invokeMethod(ugi, namenodes,
+              isObserverRead, proto, m, params);
+      return completableFuture.handle((result, e) -> {
+        if (e == null) {
+          // Check if the result is what we expected
+          if (isExpectedClass(expectedResultClass, result) &&
+              isExpectedValue(expectedResultValue, result)) {
+            // Valid result, stop here
+            return new Object[] {new RemoteResult<>(loc, result), true};
+          } else {
+            results.add(result);
+            return new Object[] {null, false};
+          }
+        }
+
+        Throwable cause = e.getCause();
+        if (cause instanceof IOException) {
+          IOException ioe = (IOException) cause;
+          // Localize the exception
+
+          ioe = processException(ioe, loc);
+
+          // Record it and move on
+          thrownExceptions.add(ioe);
+        } else {
+          // Unusual error, ClientProtocol calls always use IOException (or
+          // RemoteException). Re-wrap in IOException for compatibility with
+          // ClientProtocol.
+          LOG.error("Unexpected exception {} proxying {} to {}",
+              e.getClass(), m.getName(), ns, e);
+          IOException ioe = new IOException(
+              "Unexpected exception proxying API " + e.getMessage(), e);
+          thrownExceptions.add(ioe);
+        }
+        return new Object[] {null, false};
+      });
+    }catch (IOException ioe) {
+      throw new CompletionException(ioe);
     }
   }
 }

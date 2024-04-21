@@ -25,6 +25,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONN
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_IP_PROXY_USERS;
 import static org.apache.hadoop.hdfs.server.federation.fairness.RouterRpcFairnessConstants.CONCURRENT_NS;
 import static org.apache.hadoop.hdfs.server.federation.metrics.FederationRPCPerformanceMonitor.CONCURRENT;
+import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcClient.CUR_COMPLETABLE_FUTURE;
 
 import java.io.EOFException;
 import java.io.FileNotFoundException;
@@ -967,7 +968,12 @@ public class RouterRpcClient {
       Class<?> proto = method.getProtocol();
       Method m = method.getMethod();
       Object[] params = method.getParams(loc);
-      return invokeMethod(ugi, nns, isObserverRead, proto, m, params);
+      Object o = invokeMethod(ugi, nns, isObserverRead, proto, m, params);
+      if (!proto.getName().equals(ClientProtocol.class.getName())) {
+        return o;
+      }else {
+        return getResult();
+      }
     } finally {
       releasePermit(nsId, ugi, method, controller);
     }
@@ -1140,6 +1146,9 @@ public class RouterRpcClient {
         Object[] params = remoteMethod.getParams(loc);
         Object result = invokeMethod(
             ugi, namenodes, isObserverRead, proto, m, params);
+        if (proto.getName().equals(ClientProtocol.class.getName())) {
+          result = getResult();
+        }
         // Check if the result is what we expected
         if (isExpectedClass(expectedResultClass, result) &&
             isExpectedValue(expectedResultValue, result)) {
@@ -1197,7 +1206,7 @@ public class RouterRpcClient {
    * @param loc Location we are processing.
    * @return Exception processed for federation.
    */
-  private IOException processException(
+  protected IOException processException(
       IOException ioe, RemoteLocationContext loc) {
 
     if (ioe instanceof RemoteException) {
@@ -1263,7 +1272,7 @@ public class RouterRpcClient {
    * @return True if the result is an instance of the required class or if the
    *         expected class is null.
    */
-  private static boolean isExpectedClass(Class<?> expectedClass, Object clazz) {
+  protected static boolean isExpectedClass(Class<?> expectedClass, Object clazz) {
     if (expectedClass == null) {
       return true;
     } else if (clazz == null) {
@@ -1281,7 +1290,7 @@ public class RouterRpcClient {
    * @return True if the result is equals to the expected value or if the
    *         expected value is null.
    */
-  private static boolean isExpectedValue(Object expectedValue, Object value) {
+  protected static boolean isExpectedValue(Object expectedValue, Object value) {
     if (expectedValue == null) {
       return true;
     } else if (value == null) {
@@ -1504,6 +1513,10 @@ public class RouterRpcClient {
         Object[] paramList = method.getParams(location);
         R result = (R) invokeMethod(
             ugi, namenodes, isObserverRead, proto, m, paramList);
+        if (proto.getName().equals(ClientProtocol.class.getName())) {
+          RemoteResult<T, R> remoteResult = (RemoteResult<T, R>) new RemoteResult<>(location, getResult());
+          return Collections.singletonList(remoteResult);
+        }
         RemoteResult<T, R> remoteResult = new RemoteResult<>(location, result);
         return Collections.singletonList(remoteResult);
       } catch (IOException ioe) {
@@ -1540,8 +1553,13 @@ public class RouterRpcClient {
           callables.add(
               () -> {
                 transferThreadLocalContext(originCall, originContext);
-                return invokeMethod(
+                Object res =  invokeMethod(
                     ugi, nnList, isObserverRead, proto, m, paramList);
+                if (proto.getName().equals(ClientProtocol.class.getName())) {
+                  return getResult();
+                }else {
+                  return res;
+                }
               });
         }
       } else {
@@ -1550,8 +1568,13 @@ public class RouterRpcClient {
         callables.add(
             () -> {
               transferThreadLocalContext(originCall, originContext);
-              return invokeMethod(
+              Object res =  invokeMethod(
                   ugi, namenodes, isObserverRead, proto, m, paramList);
+              if (proto.getName().equals(ClientProtocol.class.getName())) {
+                return getResult();
+              }else {
+                return res;
+              }
             });
       }
     }
@@ -1687,7 +1710,7 @@ public class RouterRpcClient {
    * @param controller fairness policy controller to acquire permit from
    * @throws IOException If permit could not be acquired for the nsId.
    */
-  private void acquirePermit(final String nsId, final UserGroupInformation ugi,
+  protected void acquirePermit(final String nsId, final UserGroupInformation ugi,
       final RemoteMethod m, RouterRpcFairnessPolicyController controller)
       throws IOException {
     if (controller != null) {
@@ -1720,7 +1743,7 @@ public class RouterRpcClient {
    * @param m Remote method that needs to be invoked.
    * @param controller fairness policy controller to release permit from
    */
-  private void releasePermit(final String nsId, final UserGroupInformation ugi,
+  protected void releasePermit(final String nsId, final UserGroupInformation ugi,
       final RemoteMethod m, RouterRpcFairnessPolicyController controller) {
     if (controller != null) {
       controller.releasePermit(nsId);
@@ -1794,7 +1817,7 @@ public class RouterRpcClient {
    * @return A prioritized list of NNs to use for communication.
    * @throws IOException If a NN cannot be located for the nameservice ID.
    */
-  private List<? extends FederationNamenodeContext> getOrderedNamenodes(String nsId,
+  protected List<? extends FederationNamenodeContext> getOrderedNamenodes(String nsId,
       boolean isObserverRead) throws IOException {
     final List<? extends FederationNamenodeContext> namenodes;
 
@@ -1814,7 +1837,7 @@ public class RouterRpcClient {
     return namenodes;
   }
 
-  private boolean isObserverReadEligible(String nsId, Method method) {
+  protected boolean isObserverReadEligible(String nsId, Method method) {
     return isReadCall(method) && isNamespaceObserverReadEligible(nsId);
   }
 
@@ -1879,5 +1902,33 @@ public class RouterRpcClient {
       ioe = getCleanException(ioe);
     }
     return isUnavailableException(ioe);
+  }
+
+  //todo : test only
+  public Object result(UserGroupInformation ugi,
+                       List<? extends FederationNamenodeContext> namenodes,
+                       boolean useObserver, Class<?> protocol,
+                       Method method, Object... params) throws IOException {
+    Object o = invokeMethod(ugi, namenodes, useObserver, protocol, method, params);
+    if (!protocol.getName().equals(ClientProtocol.class.getName())) {
+      return o;
+    }else {
+      return getResult();
+    }
+  }
+
+  // todo : only test
+  public Object getResult() throws IOException {
+    try {
+      CompletableFuture<Object> completableFuture = CUR_COMPLETABLE_FUTURE.get();
+      System.out.println("zjcom3: " + completableFuture);
+      Object o =  completableFuture.get();
+      return o;
+    } catch (InterruptedException e) {
+    } catch (ExecutionException e) {
+      IOException ioe = (IOException) e.getCause();
+      throw ioe;
+    }
+    return null;
   }
 }

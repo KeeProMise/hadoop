@@ -2437,4 +2437,12 @@ public class RouterClientProtocol implements ClientProtocol {
   public int getRouterFederationRenameCount() {
     return rbfRename.getRouterFederationRenameCount();
   }
+
+  public RouterRpcServer getRpcServer() {
+    return rpcServer;
+  }
+
+  public RouterRpcClient getRpcClient() {
+    return rpcClient;
+  }
 }
