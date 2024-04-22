@@ -141,4 +141,6 @@ public interface RouterRpcMonitor {
    * If a path is in a read only mount point.
    */
   void routerFailureReadOnly();
+
+  void incrProcessingOp();
 }

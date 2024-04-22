@@ -58,6 +58,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 
 import static org.apache.hadoop.hdfs.server.federation.fairness.RouterRpcFairnessConstants.CONCURRENT_NS;
 import static org.apache.hadoop.hdfs.server.federation.metrics.FederationRPCPerformanceMonitor.CONCURRENT;
@@ -83,6 +84,26 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
       Configuration conf, Router router, ActiveNamenodeResolver resolver,
       RouterRpcMonitor monitor, RouterStateIdContext routerStateIdContext) {
     super(conf, router, resolver, monitor, routerStateIdContext);
+  }
+
+  @Override
+  public <T extends RemoteLocationContext> boolean invokeAll(
+      final Collection<T> locations, final RemoteMethod method)
+      throws IOException {
+    if (!method.getProtocol().getName().equals(ClientProtocol.class.getName())) {
+      Map<T, Boolean> results =
+          super.invokeConcurrent(locations, method, false, false, Boolean.class);
+      return results.containsValue(true);
+    }
+
+    invokeConcurrent(locations, method, false, false, Boolean.class);
+    CompletableFuture<Object> completableFuture = CUR_COMPLETABLE_FUTURE.get();
+    completableFuture = completableFuture.thenApply(o -> {
+      Map<T, Boolean> results = (Map<T, Boolean>) o;
+      return results.containsValue(true);
+    });
+    CUR_COMPLETABLE_FUTURE.set(completableFuture);
+    return (boolean) getResult();
   }
 
   @Override
@@ -116,7 +137,7 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
 
     addClientInfoToCallerContext(ugi);
     if (rpcMonitor != null) {
-      rpcMonitor.proxyOp();
+      rpcMonitor.incrProcessingOp();
     }
     // transfer originCall & callerContext to worker threads of executor.
     final Server.Call originCall = Server.getCurCall().get();
@@ -376,6 +397,25 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
   }
 
   @Override
+  public <T> T invokeSequential(
+      final List<? extends RemoteLocationContext> locations,
+      final RemoteMethod remoteMethod, Class<T> expectedResultClass,
+      Object expectedResultValue) throws IOException {
+    if (!remoteMethod.getProtocol().getName().equals(ClientProtocol.class.getName())) {
+      return (T) super.invokeSequential(remoteMethod, locations, expectedResultClass,
+          expectedResultValue).getResult();
+    }
+    invokeSequential(remoteMethod, locations, expectedResultClass, expectedResultValue);
+    CompletableFuture<Object> completableFuture = CUR_COMPLETABLE_FUTURE.get();
+    completableFuture = completableFuture.thenApply(o -> {
+      RemoteResult result = (RemoteResult) o;
+      return result.getResult();
+    });
+    CUR_COMPLETABLE_FUTURE.set(completableFuture);
+    return (T) getResult();
+  }
+
+  @Override
   public <R extends RemoteLocationContext, T> RemoteResult invokeSequential(
       final RemoteMethod remoteMethod, final List<R> locations,
       Class<T> expectedResultClass, Object expectedResultValue)
@@ -606,7 +646,7 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
     }
 
     if (rpcMonitor != null) {
-      rpcMonitor.proxyOp();
+      rpcMonitor.incrProcessingOp();
     }
     if (this.router.getRouterClientMetrics() != null) {
       this.router.getRouterClientMetrics().incInvokedConcurrent(m);

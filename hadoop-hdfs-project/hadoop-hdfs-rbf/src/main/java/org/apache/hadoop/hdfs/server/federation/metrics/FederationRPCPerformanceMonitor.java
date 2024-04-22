@@ -152,6 +152,13 @@ public class FederationRPCPerformanceMonitor implements RouterRpcMonitor {
   }
 
   @Override
+  public void incrProcessingOp() {
+    if (metrics != null) {
+      metrics.incrProcessingOp();
+    }
+  }
+
+  @Override
   public void proxyOpComplete(boolean success, String nsId,
       FederationNamenodeServiceState state) {
     proxyOpComplete(success, nsId, state, getProxyTime());
