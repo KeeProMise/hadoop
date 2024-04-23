@@ -50,6 +50,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -198,7 +200,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RouterRpcServer.class);
-
+  private static volatile ExecutorService executor;
 
   /** Configuration for the RPC server. */
   private Configuration conf;
@@ -725,6 +727,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
     return methodName;
   }
 
+  // todo
   /**
    * Invokes the method at default namespace, if default namespace is not
    * available then at the other available namespaces.
@@ -758,6 +761,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
     return invokeOnNs(method, clazz, io, nss);
   }
 
+  // todo
   /**
    * Invoke the method sequentially on available namespaces,
    * throw no namespace available exception, if no namespaces are available.

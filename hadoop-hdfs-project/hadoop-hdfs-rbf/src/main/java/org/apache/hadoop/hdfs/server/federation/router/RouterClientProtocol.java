@@ -1503,34 +1503,29 @@ public class RouterClientProtocol implements ClientProtocol {
         snapshotRoot, earlierSnapshotName, laterSnapshotName, startPath, index);
   }
 
-  //todo
   @Override
   public long addCacheDirective(CacheDirectiveInfo path,
       EnumSet<CacheFlag> flags) throws IOException {
     return routerCacheAdmin.addCacheDirective(path, flags);
   }
 
-  //todo
   @Override
   public void modifyCacheDirective(CacheDirectiveInfo directive,
       EnumSet<CacheFlag> flags) throws IOException {
     routerCacheAdmin.modifyCacheDirective(directive, flags);
   }
 
-  //todo
   @Override
   public void removeCacheDirective(long id) throws IOException {
     routerCacheAdmin.removeCacheDirective(id);
   }
 
-  //todo
   @Override
   public BatchedEntries<CacheDirectiveEntry> listCacheDirectives(long prevId,
       CacheDirectiveInfo filter) throws IOException {
     return routerCacheAdmin.listCacheDirectives(prevId, filter);
   }
 
-  // todo
   @Override
   public void addCachePool(CachePoolInfo info) throws IOException {
     routerCacheAdmin.addCachePool(info);
@@ -1548,7 +1543,6 @@ public class RouterClientProtocol implements ClientProtocol {
     routerCacheAdmin.removeCachePool(cachePoolName);
   }
 
-  //todo
   @Override
   public BatchedEntries<CachePoolEntry> listCachePools(String prevKey)
       throws IOException {

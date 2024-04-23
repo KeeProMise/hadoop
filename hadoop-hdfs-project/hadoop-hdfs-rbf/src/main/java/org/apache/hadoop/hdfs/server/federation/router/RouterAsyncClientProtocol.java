@@ -109,8 +109,15 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
   private static final Logger LOG =
       LoggerFactory.getLogger(RouterAsyncClientProtocol.class.getName());
 
+  private final RouterSnapshot asyncSnapshotProto;
+  private final AsyncErasureCoding asyncErasureCoding;
+  private final RouterAsyncCacheAdmin routerAsyncCacheAdmin;
+
   RouterAsyncClientProtocol(Configuration conf, RouterRpcServer rpcServer) {
     super(conf, rpcServer);
+    asyncSnapshotProto = new RouterAsyncSnapshot(rpcServer);
+    asyncErasureCoding = new AsyncErasureCoding(rpcServer);
+    routerAsyncCacheAdmin = new RouterAsyncCacheAdmin(rpcServer);
   }
 
   @Override
@@ -629,19 +636,6 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
     return (HdfsFileStatus) getResult();
   }
 
-
-  // todo
-  @Override
-  public SnapshottableDirectoryStatus[] getSnapshottableDirListing() throws IOException {
-    return super.getSnapshottableDirListing();
-  }
-
-  // todo
-  @Override
-  public SnapshotStatus[] getSnapshotListing(String snapshotRoot) throws IOException {
-    return super.getSnapshotListing(snapshotRoot);
-  }
-
   @Override
   public boolean recoverLease(String src, String clientName) throws IOException {
     RouterRpcServer rpcServer = getRpcServer();
@@ -686,6 +680,72 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
   }
 
   @Override
+  public ErasureCodingPolicyInfo[] getErasureCodingPolicies()
+      throws IOException {
+    return asyncErasureCoding.getErasureCodingPolicies();
+  }
+
+  @Override
+  public Map<String, String> getErasureCodingCodecs() throws IOException {
+    return asyncErasureCoding.getErasureCodingCodecs();
+  }
+
+  @Override
+  public AddErasureCodingPolicyResponse[] addErasureCodingPolicies(
+      ErasureCodingPolicy[] policies) throws IOException {
+    return asyncErasureCoding.addErasureCodingPolicies(policies);
+  }
+
+  @Override
+  public void removeErasureCodingPolicy(String ecPolicyName)
+      throws IOException {
+    asyncErasureCoding.removeErasureCodingPolicy(ecPolicyName);
+  }
+
+  @Override
+  public void disableErasureCodingPolicy(String ecPolicyName)
+      throws IOException {
+    asyncErasureCoding.disableErasureCodingPolicy(ecPolicyName);
+  }
+
+  @Override
+  public void enableErasureCodingPolicy(String ecPolicyName)
+      throws IOException {
+    asyncErasureCoding.enableErasureCodingPolicy(ecPolicyName);
+  }
+
+  @Override
+  public ErasureCodingPolicy getErasureCodingPolicy(String src)
+      throws IOException {
+    return asyncErasureCoding.getErasureCodingPolicy(src);
+  }
+
+  @Override
+  public void setErasureCodingPolicy(String src, String ecPolicyName)
+      throws IOException {
+    asyncErasureCoding.setErasureCodingPolicy(src, ecPolicyName);
+  }
+
+  @Override
+  public void unsetErasureCodingPolicy(String src) throws IOException {
+    asyncErasureCoding.unsetErasureCodingPolicy(src);
+  }
+
+  @Override
+  public ECTopologyVerifierResult getECTopologyResultForPolicies(
+      String... policyNames) throws IOException {
+    RouterRpcServer rpcServer = getRpcServer();
+    rpcServer.checkOperation(NameNode.OperationCategory.UNCHECKED, true);
+    return asyncErasureCoding.getECTopologyResultForPolicies(policyNames);
+  }
+
+  @Override
+  public ECBlockGroupStats getECBlockGroupStats() throws IOException {
+    return asyncErasureCoding.getECBlockGroupStats();
+  }
+
+
+  @Override
   public ReplicatedBlockStats getReplicatedBlockStats() throws IOException {
     RouterRpcServer rpcServer = getRpcServer();
     RouterRpcClient rpcClient = getRpcClient();
@@ -705,12 +765,6 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
     });
     setCurCompletableFuture(completableFuture);
     return (ReplicatedBlockStats) getResult();
-  }
-
-  //todo
-  @Override
-  public ECBlockGroupStats getECBlockGroupStats() throws IOException {
-    return super.getECBlockGroupStats();
   }
 
   //todo
@@ -844,7 +898,8 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
   }
 
   @Override
-  public RollingUpgradeInfo rollingUpgrade(HdfsConstants.RollingUpgradeAction action) throws IOException {
+  public RollingUpgradeInfo rollingUpgrade(
+      HdfsConstants.RollingUpgradeAction action) throws IOException {
     RouterRpcServer rpcServer = getRpcServer();
     RouterRpcClient rpcClient = getRpcClient();
     ActiveNamenodeResolver namenodeResolver = getNamenodeResolver();
@@ -946,52 +1001,63 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
     super.cancelDelegationToken(token);
   }
 
-  // todo
   @Override
-  public String createSnapshot(String snapshotRoot, String snapshotName) throws IOException {
-    return super.createSnapshot(snapshotRoot, snapshotName);
+  public String createSnapshot(
+      String snapshotRoot, String snapshotName) throws IOException {
+    return asyncSnapshotProto.createSnapshot(snapshotRoot, snapshotName);
   }
 
-  //todo
   @Override
-  public void deleteSnapshot(String snapshotRoot, String snapshotName) throws IOException {
-    super.deleteSnapshot(snapshotRoot, snapshotName);
+  public void deleteSnapshot(
+      String snapshotRoot, String snapshotName) throws IOException {
+    asyncSnapshotProto.deleteSnapshot(snapshotRoot, snapshotName);
   }
 
-  //todo
+
+  @Override
+  public void allowSnapshot(String snapshotRoot) throws IOException {
+    asyncSnapshotProto.allowSnapshot(snapshotRoot);
+  }
+
+  @Override
+  public void disallowSnapshot(String snapshot) throws IOException {
+    asyncSnapshotProto.disallowSnapshot(snapshot);
+  }
+
   @Override
   public void renameSnapshot(
       String snapshotRoot, String snapshotOldName,
       String snapshotNewName) throws IOException {
-    super.renameSnapshot(snapshotRoot, snapshotOldName, snapshotNewName);
+    asyncSnapshotProto.renameSnapshot(
+        snapshotRoot, snapshotOldName, snapshotNewName);
   }
 
-  //todo
   @Override
-  public void allowSnapshot(String snapshotRoot) throws IOException {
-    super.allowSnapshot(snapshotRoot);
+  public SnapshottableDirectoryStatus[] getSnapshottableDirListing()
+      throws IOException {
+    return asyncSnapshotProto.getSnapshottableDirListing();
   }
 
-  //todo
   @Override
-  public void disallowSnapshot(String snapshotRoot) throws IOException {
-    super.disallowSnapshot(snapshotRoot);
+  public SnapshotStatus[] getSnapshotListing(String snapshotRoot)
+      throws IOException {
+    return asyncSnapshotProto.getSnapshotListing(snapshotRoot);
   }
 
   @Override
   public SnapshotDiffReport getSnapshotDiffReport(
-      String snapshotRoot, String fromSnapshot,
-      String toSnapshot) throws IOException {
-    return super.getSnapshotDiffReport(snapshotRoot, fromSnapshot, toSnapshot);
+      String snapshotRoot,
+      String earlierSnapshotName, String laterSnapshotName) throws IOException {
+    return asyncSnapshotProto.getSnapshotDiffReport(
+        snapshotRoot, earlierSnapshotName, laterSnapshotName);
   }
 
-  //todo
   @Override
   public SnapshotDiffReportListing getSnapshotDiffReportListing(
-      String snapshotRoot, String fromSnapshot, String toSnapshot,
+      String snapshotRoot, String earlierSnapshotName, String laterSnapshotName,
       byte[] startPath, int index) throws IOException {
-    return super.getSnapshotDiffReportListing(snapshotRoot, fromSnapshot,
-        toSnapshot, startPath, index);
+    return asyncSnapshotProto.getSnapshotDiffReportListing(
+        snapshotRoot, earlierSnapshotName, laterSnapshotName, startPath, index);
   }
 
   @Override
@@ -1088,6 +1154,52 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
     });
     setCurCompletableFuture(completableFuture);
     return (Path) getResult();
+  }
+
+
+  @Override
+  public long addCacheDirective(CacheDirectiveInfo path,
+                                EnumSet<CacheFlag> flags) throws IOException {
+    return routerAsyncCacheAdmin.addCacheDirective(path, flags);
+  }
+
+  @Override
+  public void modifyCacheDirective(CacheDirectiveInfo directive,
+                                   EnumSet<CacheFlag> flags) throws IOException {
+    routerAsyncCacheAdmin.modifyCacheDirective(directive, flags);
+  }
+
+  @Override
+  public void removeCacheDirective(long id) throws IOException {
+    routerAsyncCacheAdmin.removeCacheDirective(id);
+  }
+
+  @Override
+  public BatchedRemoteIterator.BatchedEntries<CacheDirectiveEntry> listCacheDirectives(
+      long prevId,
+      CacheDirectiveInfo filter) throws IOException {
+    return routerAsyncCacheAdmin.listCacheDirectives(prevId, filter);
+  }
+
+  @Override
+  public void addCachePool(CachePoolInfo info) throws IOException {
+    routerAsyncCacheAdmin.addCachePool(info);
+  }
+
+  @Override
+  public void modifyCachePool(CachePoolInfo info) throws IOException {
+    routerAsyncCacheAdmin.modifyCachePool(info);
+  }
+
+  @Override
+  public void removeCachePool(String cachePoolName) throws IOException {
+    routerAsyncCacheAdmin.removeCachePool(cachePoolName);
+  }
+
+  @Override
+  public BatchedRemoteIterator.BatchedEntries<CachePoolEntry> listCachePools(String prevKey)
+      throws IOException {
+    return routerAsyncCacheAdmin.listCachePools(prevKey);
   }
 
   private static CompletableFuture<Object> getCompletableFuture() {
