@@ -116,7 +116,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -346,7 +350,7 @@ public class RouterClientProtocol implements ClientProtocol {
    * @throws IOException If this path is not fault tolerant or the exception
    *                     should not be retried (e.g., NSQuotaExceededException).
    */
-  private List<RemoteLocation> checkFaultTolerantRetry(
+  List<RemoteLocation> checkFaultTolerantRetry(
       final RemoteMethod method, final String src, final IOException ioe,
       final RemoteLocation excludeLoc, final List<RemoteLocation> locations)
           throws IOException {
@@ -830,7 +834,7 @@ public class RouterClientProtocol implements ClientProtocol {
   /**
    * For {@link #getListing(String,byte[],boolean) GetLisiting} to sort results.
    */
-  private static class GetListingComparator
+  static class GetListingComparator
       implements Comparator<byte[]>, Serializable {
     @Override
     public int compare(byte[] o1, byte[] o2) {
@@ -1092,7 +1096,7 @@ public class RouterClientProtocol implements ClientProtocol {
     return mergeDtanodeStorageReport(dnSubcluster);
   }
 
-  private DatanodeStorageReport[] mergeDtanodeStorageReport(
+  DatanodeStorageReport[] mergeDtanodeStorageReport(
       Map<String, DatanodeStorageReport[]> dnSubcluster) {
     // Avoid repeating machines in multiple subclusters
     Map<String, DatanodeStorageReport> datanodesMap = new LinkedHashMap<>();
@@ -1499,49 +1503,58 @@ public class RouterClientProtocol implements ClientProtocol {
         snapshotRoot, earlierSnapshotName, laterSnapshotName, startPath, index);
   }
 
+  //todo
   @Override
   public long addCacheDirective(CacheDirectiveInfo path,
       EnumSet<CacheFlag> flags) throws IOException {
     return routerCacheAdmin.addCacheDirective(path, flags);
   }
 
+  //todo
   @Override
   public void modifyCacheDirective(CacheDirectiveInfo directive,
       EnumSet<CacheFlag> flags) throws IOException {
     routerCacheAdmin.modifyCacheDirective(directive, flags);
   }
 
+  //todo
   @Override
   public void removeCacheDirective(long id) throws IOException {
     routerCacheAdmin.removeCacheDirective(id);
   }
 
+  //todo
   @Override
   public BatchedEntries<CacheDirectiveEntry> listCacheDirectives(long prevId,
       CacheDirectiveInfo filter) throws IOException {
     return routerCacheAdmin.listCacheDirectives(prevId, filter);
   }
 
+  // todo
   @Override
   public void addCachePool(CachePoolInfo info) throws IOException {
     routerCacheAdmin.addCachePool(info);
   }
 
+  //todo
   @Override
   public void modifyCachePool(CachePoolInfo info) throws IOException {
     routerCacheAdmin.modifyCachePool(info);
   }
 
+  //todo
   @Override
   public void removeCachePool(String cachePoolName) throws IOException {
     routerCacheAdmin.removeCachePool(cachePoolName);
   }
 
+  //todo
   @Override
   public BatchedEntries<CachePoolEntry> listCachePools(String prevKey)
       throws IOException {
     return routerCacheAdmin.listCachePools(prevKey);
   }
+
 
   @Override
   public void modifyAclEntries(String src, List<AclEntry> aclSpec)
@@ -1814,6 +1827,7 @@ public class RouterClientProtocol implements ClientProtocol {
         .setQuota(path, namespaceQuota, storagespaceQuota, type, true);
   }
 
+  // todo
   @Override
   public QuotaUsage getQuotaUsage(String path) throws IOException {
     return rpcServer.getQuotaModule().getQuotaUsage(path);
@@ -1900,17 +1914,20 @@ public class RouterClientProtocol implements ClientProtocol {
     return erasureCoding.getErasureCodingPolicy(src);
   }
 
+  //todo
   @Override
   public void setErasureCodingPolicy(String src, String ecPolicyName)
       throws IOException {
     erasureCoding.setErasureCodingPolicy(src, ecPolicyName);
   }
 
+  //todo
   @Override
   public void unsetErasureCodingPolicy(String src) throws IOException {
     erasureCoding.unsetErasureCodingPolicy(src);
   }
 
+  //todo
   @Override
   public ECTopologyVerifierResult getECTopologyResultForPolicies(
       String... policyNames) throws IOException {
@@ -1918,6 +1935,7 @@ public class RouterClientProtocol implements ClientProtocol {
     return erasureCoding.getECTopologyResultForPolicies(policyNames);
   }
 
+  //todo
   @Override
   public ECBlockGroupStats getECBlockGroupStats() throws IOException {
     return erasureCoding.getECBlockGroupStats();
@@ -1967,11 +1985,13 @@ public class RouterClientProtocol implements ClientProtocol {
     rpcClient.invokeConcurrent(namespacesEligibleForObserverReads, method);
   }
 
+  //todo
   @Override
   public void satisfyStoragePolicy(String path) throws IOException {
     storagePolicy.satisfyStoragePolicy(path);
   }
 
+  //todo
   @Override
   public DatanodeInfo[] getSlowDatanodeReport() throws IOException {
     rpcServer.checkOperation(NameNode.OperationCategory.UNCHECKED);
@@ -2075,7 +2095,7 @@ public class RouterClientProtocol implements ClientProtocol {
    * @param summaries Collection of individual summaries.
    * @return Aggregated content summary.
    */
-  private ContentSummary aggregateContentSummary(
+  ContentSummary aggregateContentSummary(
       Collection<ContentSummary> summaries) {
     if (summaries.size() == 1) {
       return summaries.iterator().next();
@@ -2179,7 +2199,7 @@ public class RouterClientProtocol implements ClientProtocol {
    * @param mask The permission mask of the child.
    * @return The permission mask of the parent.
    */
-  private static FsPermission getParentPermission(final FsPermission mask) {
+  static FsPermission getParentPermission(final FsPermission mask) {
     FsPermission ret = new FsPermission(
         mask.getUserAction().or(FsAction.WRITE_EXECUTE),
         mask.getGroupAction(),
@@ -2288,7 +2308,7 @@ public class RouterClientProtocol implements ClientProtocol {
    * @param path Name of the path to start checking dates from.
    * @return Map with the modification dates for all sub-entries.
    */
-  private Map<String, Long> getMountPointDates(String path) {
+  Map<String, Long> getMountPointDates(String path) {
     Map<String, Long> ret = new TreeMap<>();
     if (subclusterResolver instanceof MountTableResolver) {
       try {
@@ -2351,7 +2371,7 @@ public class RouterClientProtocol implements ClientProtocol {
   /**
    * Get listing on remote locations.
    */
-  private List<RemoteResult<RemoteLocation, DirectoryListing>> getListingInt(
+  List<RemoteResult<RemoteLocation, DirectoryListing>> getListingInt(
       String src, byte[] startAfter, boolean needLocation) throws IOException {
     try {
       List<RemoteLocation> locations =
@@ -2390,7 +2410,7 @@ public class RouterClientProtocol implements ClientProtocol {
    * @param remainingEntries how many entries left from subcluster
    * @return
    */
-  private static boolean shouldAddMountPoint(
+  static boolean shouldAddMountPoint(
       byte[] mountPoint, byte[] lastEntry, byte[] startAfter,
       int remainingEntries) {
     if (comparator.compare(mountPoint, startAfter) > 0 &&
@@ -2444,5 +2464,37 @@ public class RouterClientProtocol implements ClientProtocol {
 
   public RouterRpcClient getRpcClient() {
     return rpcClient;
+  }
+
+  public ActiveNamenodeResolver getNamenodeResolver() {
+    return namenodeResolver;
+  }
+
+  public boolean isAllowPartialList() {
+    return allowPartialList;
+  }
+
+  public boolean isDefaultNameServiceEnabled() {
+    return defaultNameServiceEnabled;
+  }
+
+  public FileSubclusterResolver getSubclusterResolver() {
+    return subclusterResolver;
+  }
+
+  public static GetListingComparator getComparator() {
+    return comparator;
+  }
+
+  public String getSuperUser() {
+    return superUser;
+  }
+
+  public String getSuperGroup() {
+    return superGroup;
+  }
+
+  public long getMountStatusTimeOut() {
+    return mountStatusTimeOut;
   }
 }

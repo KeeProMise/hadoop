@@ -733,6 +733,14 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
   }
 
   @Override
+  public <T> T invokeSingle(final RemoteLocationContext location,
+                            RemoteMethod remoteMethod, Class<T> clazz) throws IOException {
+    List<RemoteLocationContext> locations = Collections.singletonList(location);
+    invokeSequential(locations, remoteMethod);
+    return (T) getResult();
+  }
+
+  @Override
   public Object invokeSingle(final String nsId, RemoteMethod method)
       throws IOException {
     Object result = super.invokeSingle(nsId, method);

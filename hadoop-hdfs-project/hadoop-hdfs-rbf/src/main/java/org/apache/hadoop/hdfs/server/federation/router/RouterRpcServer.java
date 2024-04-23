@@ -402,7 +402,11 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
     // Initialize modules
     this.quotaCall = new Quota(this.router, this);
     this.nnProto = new RouterNamenodeProtocol(this);
-    this.clientProto = new RouterClientProtocol(conf, this);
+    if (router.isEnableAsync()) {
+      this.clientProto = new RouterAsyncClientProtocol(conf, this);
+    } else {
+      this.clientProto = new RouterClientProtocol(conf, this);
+    }
     this.routerProto = new RouterUserProtocol(this);
 
     long dnCacheExpire = conf.getTimeDuration(
