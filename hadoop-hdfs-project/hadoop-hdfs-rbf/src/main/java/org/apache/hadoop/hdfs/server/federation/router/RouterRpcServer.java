@@ -60,6 +60,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.HAUtil;
 import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
+import org.apache.hadoop.hdfs.protocolPB.RouterAsyncClientProtocolTranslatorPB;
 import org.apache.hadoop.thirdparty.com.google.common.cache.CacheBuilder;
 import org.apache.hadoop.thirdparty.com.google.common.cache.CacheLoader;
 import org.apache.hadoop.thirdparty.com.google.common.cache.LoadingCache;
@@ -548,6 +549,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
     if (this.fedRenameScheduler != null) {
       fedRenameScheduler.shutDown();
     }
+    RouterAsyncClientProtocolTranslatorPB.shutdown();
     super.serviceStop();
   }
 

@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -389,6 +390,13 @@ public class RouterAsyncClientProtocolTranslatorPB extends ClientNamenodeProtoco
       }
     }
     return executor;
+  }
+
+  public static void shutdown() {
+    if (executor != null) {
+      ((ExecutorService)executor).shutdownNow();
+    }
+    executor = null;
   }
 
   @Override
