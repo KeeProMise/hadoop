@@ -24,15 +24,6 @@ import java.util.HashMap;
 import java.util.List;
 
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -135,7 +126,6 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.Delete
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.DeleteSnapshotResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.DisallowSnapshotRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.DisallowSnapshotResponseProto;
-import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.FinalizeUpgradeRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.FinalizeUpgradeResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.FsyncRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.FsyncResponseProto;
@@ -149,7 +139,6 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetCon
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetContentSummaryResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetCurrentEditLogTxidRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetCurrentEditLogTxidResponseProto;
-import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetDataEncryptionKeyRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetDataEncryptionKeyResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetDatanodeReportRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetDatanodeReportResponseProto;
@@ -163,11 +152,8 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetFil
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetFileInfoResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetFileLinkInfoRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetFileLinkInfoResponseProto;
-import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetFsECBlockGroupStatsRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetFsECBlockGroupStatsResponseProto;
-import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetFsReplicatedBlockStatsRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetFsReplicatedBlockStatsResponseProto;
-import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetFsStatusRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetLinkTargetRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetLinkTargetResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetListingRequestProto;
@@ -190,7 +176,6 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetSna
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetSnapshottableDirListingResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetSnapshotListingRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetSnapshotListingResponseProto;
-import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetStoragePoliciesRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetStoragePoliciesResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetStoragePolicyRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetStoragePolicyResponseProto;
@@ -219,7 +204,6 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.MsyncR
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.OpenFilesBatchResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RecoverLeaseRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RecoverLeaseResponseProto;
-import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RefreshNodesRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RefreshNodesResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RemoveCacheDirectiveRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RemoveCacheDirectiveResponseProto;
@@ -237,7 +221,6 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.Report
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.ReportBadBlocksResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RestoreFailedStorageRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RestoreFailedStorageResponseProto;
-import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RollEditsRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RollEditsResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RollingUpgradeRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RollingUpgradeResponseProto;
@@ -267,7 +250,6 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.Update
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.UpdateBlockForPipelineResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.UpdatePipelineRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.UpdatePipelineResponseProto;
-import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.UpgradeStatusRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.UpgradeStatusResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.SatisfyStoragePolicyRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.SatisfyStoragePolicyResponseProto;
@@ -283,14 +265,12 @@ import org.apache.hadoop.hdfs.protocol.proto.EncryptionZonesProtos.ReencryptEncr
 import org.apache.hadoop.hdfs.protocol.proto.ErasureCodingProtos;
 import org.apache.hadoop.hdfs.protocol.proto.ErasureCodingProtos.AddErasureCodingPoliciesRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ErasureCodingProtos.AddErasureCodingPoliciesResponseProto;
-import org.apache.hadoop.hdfs.protocol.proto.ErasureCodingProtos.GetErasureCodingPoliciesRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ErasureCodingProtos.GetErasureCodingPoliciesResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ErasureCodingProtos.GetErasureCodingPolicyRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ErasureCodingProtos.GetErasureCodingPolicyResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ErasureCodingProtos.RemoveErasureCodingPolicyRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ErasureCodingProtos.EnableErasureCodingPolicyRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ErasureCodingProtos.DisableErasureCodingPolicyRequestProto;
-import org.apache.hadoop.hdfs.protocol.proto.ErasureCodingProtos.GetErasureCodingCodecsRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ErasureCodingProtos.GetErasureCodingCodecsResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ErasureCodingProtos.SetErasureCodingPolicyRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ErasureCodingProtos.UnsetErasureCodingPolicyRequestProto;
@@ -310,14 +290,10 @@ import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifie
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
 import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.ipc.Client;
-import org.apache.hadoop.ipc.ProtobufRpcEngine2;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.RpcClientUtil;
-import org.apache.hadoop.ipc.Server;
-import org.apache.hadoop.ipc.internal.ShadedProtobufHelper;
 import org.apache.hadoop.security.proto.SecurityProtos;
 import org.apache.hadoop.security.proto.SecurityProtos.CancelDelegationTokenRequestProto;
 import org.apache.hadoop.security.proto.SecurityProtos.GetDelegationTokenRequestProto;
@@ -330,9 +306,13 @@ import org.apache.hadoop.thirdparty.protobuf.ServiceException;
 
 import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.concurrent.AsyncGet;
+import org.apache.hadoop.hdfs.protocolPB.AsyncRpcProtocolPBUtil.Response;
 
+import static org.apache.hadoop.hdfs.protocolPB.AsyncRpcProtocolPBUtil.asyncIpc;
+import static org.apache.hadoop.hdfs.protocolPB.AsyncRpcProtocolPBUtil.asyncResponse;
 import static org.apache.hadoop.ipc.internal.ShadedProtobufHelper.getRemoteException;
 import static org.apache.hadoop.ipc.internal.ShadedProtobufHelper.ipc;
+
 
 /**
  * This class forwards NN's ClientProtocol calls as RPC calls to the NN server
@@ -341,62 +321,10 @@ import static org.apache.hadoop.ipc.internal.ShadedProtobufHelper.ipc;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Stable
-public class RouterAsyncClientProtocolTranslatorPB extends ClientNamenodeProtocolTranslatorPB {
-  public static final ThreadLocal<CompletableFuture<Object>> completableFutureThreadLocal
-      = new ThreadLocal<>();
-  private static volatile Executor executor;
+public class RouterClientProtocolTranslatorPB extends ClientNamenodeProtocolTranslatorPB {
 
-  public RouterAsyncClientProtocolTranslatorPB(ClientNamenodeProtocolPB proxy) {
+  public RouterClientProtocolTranslatorPB(ClientNamenodeProtocolPB proxy) {
     super(proxy);
-  }
-
-  private  <T> AsyncGet<T, Exception> asyncIpc(
-      ShadedProtobufHelper.IpcCall<T> call) throws IOException {
-    CompletableFuture<Object> completableFuture = new CompletableFuture<>();
-    Client.COMPLETABLE_FUTURE_THREAD_LOCAL.set(completableFuture);
-    ipc(call);
-    return (AsyncGet<T, Exception>)ProtobufRpcEngine2.getAsyncReturnMessage();
-  }
-
-  private <T> void asyncResponse(Response<T> response) {
-    CompletableFuture<T> completableFuture =
-        (CompletableFuture<T>) Client.COMPLETABLE_FUTURE_THREAD_LOCAL.get();
-
-    CompletableFuture<Object> resCompletableFuture = completableFuture.thenApplyAsync(t -> {
-      try {
-        return response.response();
-      }catch (Exception e) {
-        throw new CompletionException(e);
-      }
-    }, getExecutor());
-    setThreadLocal(resCompletableFuture);
-  }
-
-  public static void setThreadLocal(CompletableFuture<Object> completableFuture) {
-    completableFutureThreadLocal.set(completableFuture);
-  }
-
-  public static CompletableFuture<Object> getCompletableFuture() {
-    return completableFutureThreadLocal.get();
-  }
-
-  public static Executor getExecutor() {
-    if (executor == null) {
-      synchronized (RouterAsyncClientProtocolTranslatorPB.class) {
-        if (executor == null) {
-          executor = Executors.newFixedThreadPool(100);
-        }
-        return executor;
-      }
-    }
-    return executor;
-  }
-
-  public static void shutdown() {
-    if (executor != null) {
-      ((ExecutorService)executor).shutdownNow();
-    }
-    executor = null;
   }
 
   @Override
@@ -1210,12 +1138,9 @@ public class RouterAsyncClientProtocolTranslatorPB extends ClientNamenodeProtoco
     if (Client.isAsynchronousMode()) {
       AsyncGet<GetLocatedFileInfoResponseProto, Exception> asyncGet
           = asyncIpc(() -> rpcProxy.getLocatedFileInfo(null, req));
-      asyncResponse(new Response<Object>() {
-        @Override
-        public Object response() throws Exception {
-          GetLocatedFileInfoResponseProto res = asyncGet.get(-1, null);
-          return res.hasFs() ? PBHelperClient.convert(res.getFs()) : null;
-        }
+      asyncResponse((AsyncRpcProtocolPBUtil.Response<Object>) () -> {
+        GetLocatedFileInfoResponseProto res = asyncGet.get(-1, null);
+        return res.hasFs() ? PBHelperClient.convert(res.getFs()) : null;
       });
       return null;
     }
@@ -1344,7 +1269,7 @@ public class RouterAsyncClientProtocolTranslatorPB extends ClientNamenodeProtoco
     if (Client.isAsynchronousMode()) {
       AsyncGet<GetLinkTargetResponseProto, Exception> asyncGet
           = asyncIpc(() -> rpcProxy.getLinkTarget(null, req));
-      asyncResponse(new Response<Object>() {
+      asyncResponse(new AsyncRpcProtocolPBUtil.Response<Object>() {
         @Override
         public Object response() throws Exception {
           GetLinkTargetResponseProto rsp = asyncGet.get(-1, null);
@@ -2775,11 +2700,6 @@ public class RouterAsyncClientProtocolTranslatorPB extends ClientNamenodeProtoco
     } catch (ServiceException e) {
       throw getRemoteException(e);
     }
-  }
-
-  @FunctionalInterface
-  public interface Response<T> {
-    T response() throws Exception;
   }
 }
 

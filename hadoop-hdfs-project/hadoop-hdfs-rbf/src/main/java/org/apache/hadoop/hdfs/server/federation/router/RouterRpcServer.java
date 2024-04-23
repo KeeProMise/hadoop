@@ -60,7 +60,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.HAUtil;
 import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
-import org.apache.hadoop.hdfs.protocolPB.RouterAsyncClientProtocolTranslatorPB;
+import org.apache.hadoop.hdfs.protocolPB.RouterClientProtocolTranslatorPB;
 import org.apache.hadoop.thirdparty.com.google.common.cache.CacheBuilder;
 import org.apache.hadoop.thirdparty.com.google.common.cache.CacheLoader;
 import org.apache.hadoop.thirdparty.com.google.common.cache.LoadingCache;
@@ -258,6 +258,19 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
   private RouterRenameOption routerRenameOption;
   /** Schedule the router federation rename jobs. */
   private BalanceProcedureScheduler fedRenameScheduler;
+
+  public static Executor getExecutor() {
+    if (executor == null) {
+      synchronized (RouterRpcServer.class) {
+        if (executor == null) {
+          executor = Executors.newFixedThreadPool(100);
+        }
+        return executor;
+      }
+    }
+    return executor;
+  }
+
   /**
    * Construct a router RPC server.
    *
@@ -271,7 +284,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
       ActiveNamenodeResolver nnResolver, FileSubclusterResolver fileResolver)
           throws IOException {
     super(RouterRpcServer.class.getName());
-
+    executor = null;
     this.conf = conf;
     this.router = router;
     this.namenodeResolver = nnResolver;
@@ -549,7 +562,9 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
     if (this.fedRenameScheduler != null) {
       fedRenameScheduler.shutDown();
     }
-    RouterAsyncClientProtocolTranslatorPB.shutdown();
+    if (executor != null) {
+      executor.shutdown();
+    }
     super.serviceStop();
   }
 

@@ -19,8 +19,7 @@ package org.apache.hadoop.hdfs.server.federation.router;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.NameNodeProxiesClient;
-import org.apache.hadoop.hdfs.protocol.ClientProtocol;
-import org.apache.hadoop.hdfs.protocolPB.RouterAsyncClientProtocolTranslatorPB;
+import org.apache.hadoop.hdfs.protocolPB.AsyncRpcProtocolPBUtil;
 import org.apache.hadoop.hdfs.server.federation.fairness.RouterRpcFairnessPolicyController;
 import org.apache.hadoop.hdfs.server.federation.resolver.ActiveNamenodeResolver;
 import org.apache.hadoop.hdfs.server.federation.resolver.FederationNamenodeContext;
@@ -89,12 +88,6 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
   public <T extends RemoteLocationContext> boolean invokeAll(
       final Collection<T> locations, final RemoteMethod method)
       throws IOException {
-    if (!method.getProtocol().getName().equals(ClientProtocol.class.getName())) {
-      Map<T, Boolean> results =
-          super.invokeConcurrent(locations, method, false, false, Boolean.class);
-      return results.containsValue(true);
-    }
-
     invokeConcurrent(locations, method, false, false, Boolean.class);
     CompletableFuture<Object> completableFuture = CUR_COMPLETABLE_FUTURE.get();
     completableFuture = completableFuture.thenApply(o -> {
@@ -112,13 +105,10 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
       boolean useObserver, Class<?> protocol,
       Method method, Object... params) throws IOException {
     LOG.info("zj test : {}, {}, {}, {}", method.getName(), useObserver, namenodes.toString());
-    if (protocol.getName().equals(ClientProtocol.class.getName())) {
-      CompletableFuture<Object> completableFuture =
-          invokeMethodAsync(ugi, namenodes, useObserver, protocol, method, params);
-      CUR_COMPLETABLE_FUTURE.set(completableFuture);
-      return completableFuture;
-    }
-    return super.invokeMethod(ugi, namenodes, useObserver, protocol, method, params);
+    CompletableFuture<Object> completableFuture =
+        invokeMethodAsync(ugi, namenodes, useObserver, protocol, method, params);
+    CUR_COMPLETABLE_FUTURE.set(completableFuture);
+    return completableFuture;
   }
 
   private CompletableFuture<Object> invokeMethodAsync(
@@ -147,7 +137,7 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
 
     CompletableFuture<Object[]> completableFuture = CompletableFuture.supplyAsync(
         () -> new Object[]{useObserver, false, false, null},
-        RouterAsyncClientProtocolTranslatorPB.getExecutor());
+        RouterRpcServer.getExecutor());
 
     for (FederationNamenodeContext namenode : namenodes) {
       completableFuture = completableFuture.thenCompose(args -> {
@@ -198,7 +188,6 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
       }
     });
   }
-
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   private CompletableFuture<Object[]> invokeAsyncTask(
@@ -340,7 +329,7 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
       Client.setAsynchronousMode(true);
       method.invoke(obj, params);
       CompletableFuture<Object> completableFuture =
-          RouterAsyncClientProtocolTranslatorPB.getCompletableFuture();
+          AsyncRpcProtocolPBUtil.getCompletableFuture();
 
       return completableFuture.handle((BiFunction<Object, Throwable, Object>) (result, e) -> {
         if (e == null) {
@@ -400,10 +389,6 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
       final List<? extends RemoteLocationContext> locations,
       final RemoteMethod remoteMethod, Class<T> expectedResultClass,
       Object expectedResultValue) throws IOException {
-    if (!remoteMethod.getProtocol().getName().equals(ClientProtocol.class.getName())) {
-      return (T) super.invokeSequential(remoteMethod, locations, expectedResultClass,
-          expectedResultValue).getResult();
-    }
     invokeSequential(remoteMethod, locations, expectedResultClass, expectedResultValue);
     CompletableFuture<Object> completableFuture = CUR_COMPLETABLE_FUTURE.get();
     completableFuture = completableFuture.thenApply(o -> {
@@ -419,12 +404,6 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
       final RemoteMethod remoteMethod, final List<R> locations,
       Class<T> expectedResultClass, Object expectedResultValue)
       throws IOException {
-    Class<?> proto = remoteMethod.getProtocol();
-    if (!proto.getName().equals(ClientProtocol.class.getName())) {
-      return super.invokeSequential(
-          remoteMethod, locations, expectedResultClass, expectedResultValue);
-    }
-
     RouterRpcFairnessPolicyController controller = getRouterRpcFairnessPolicyController();
     final UserGroupInformation ugi = RouterRpcServer.getRemoteUser();
     final Method m = remoteMethod.getMethod();
@@ -447,7 +426,7 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
         return invokeSequentialToOneNs(originCall, originContext, ugi, m,
             thrownExceptions, remoteMethod, loc, expectedResultClass,
             expectedResultValue, results);
-      }, RouterAsyncClientProtocolTranslatorPB.getExecutor());
+      }, RouterRpcServer.getExecutor());
 
       releasePermit(ns, ugi, remoteMethod, controller);
     }
@@ -542,10 +521,6 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
       final Collection<T> locations, final RemoteMethod method,
       boolean requireResponse, boolean standby, long timeOutMs, Class<R> clazz)
       throws IOException {
-    if (!method.getProtocol().getName().equals(ClientProtocol.class.getName())) {
-      return super.invokeConcurrent(locations, method, requireResponse,
-          standby, timeOutMs, clazz);
-    }
     invokeConcurrentAsync(locations, method, standby, timeOutMs, clazz);
     CompletableFuture<Object> completableFuture = CUR_COMPLETABLE_FUTURE.get();
     completableFuture =  completableFuture.thenApply(o -> {
@@ -591,10 +566,6 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
       invokeConcurrent(final Collection<T> locations,
                    final RemoteMethod method, boolean standby, long timeOutMs,
                    Class<R> clazz) throws IOException {
-
-    if (!method.getProtocol().getName().equals(ClientProtocol.class.getName())) {
-      return super.invokeConcurrent(locations, method, standby, timeOutMs, clazz);
-    }
     invokeConcurrentAsync(locations, method, standby, timeOutMs, clazz);
     return (List<RemoteResult<T, R>>) getResult();
   }
@@ -603,10 +574,6 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
       invokeConcurrentAsync(final Collection<T> locations,
                    final RemoteMethod method, boolean standby, long timeOutMs,
                    Class<R> clazz) throws IOException {
-    if (!method.getProtocol().getName().equals(ClientProtocol.class.getName())) {
-      return super.invokeConcurrent(locations, method, standby, timeOutMs, clazz);
-    }
-
     final UserGroupInformation ugi = RouterRpcServer.getRemoteUser();
     final Method m = method.getMethod();
 
@@ -742,10 +709,7 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
   @Override
   public Object invokeSingle(final String nsId, RemoteMethod method)
       throws IOException {
-    Object result = super.invokeSingle(nsId, method);
-    if (!method.getProtocol().getName().equals(ClientProtocol.class.getName())) {
-      return result;
-    }
+    super.invokeSingle(nsId, method);
     return getResult();
   }
 }
