@@ -1,8 +1,10 @@
 package org.apache.hadoop.hdfs.protocolPB;
 
 import org.apache.hadoop.hdfs.server.federation.router.RouterRpcServer;
+import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.ProtobufRpcEngine2;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ipc.internal.ShadedProtobufHelper;
 import org.apache.hadoop.util.concurrent.AsyncGet;
 
@@ -29,9 +31,14 @@ public final class AsyncRpcProtocolPBUtil {
   public static <T> void asyncResponse(Response<T> response) {
     CompletableFuture<T> completableFuture =
         (CompletableFuture<T>) Client.COMPLETABLE_FUTURE_THREAD_LOCAL.get();
+    // transfer originCall & callerContext to worker threads of executor.
+    final Server.Call originCall = Server.getCurCall().get();
+    final CallerContext originContext = CallerContext.getCurrent();
 
     CompletableFuture<Object> resCompletableFuture = completableFuture.thenApplyAsync(t -> {
       try {
+        Server.getCurCall().set(originCall);
+        CallerContext.setCurrent(originContext);
         return response.response();
       }catch (Exception e) {
         throw new CompletionException(e);
