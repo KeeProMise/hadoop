@@ -60,13 +60,12 @@ import java.util.function.BiFunction;
 
 import static org.apache.hadoop.hdfs.server.federation.fairness.RouterRpcFairnessConstants.CONCURRENT_NS;
 import static org.apache.hadoop.hdfs.server.federation.metrics.FederationRPCPerformanceMonitor.CONCURRENT;
+import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.CUR_COMPLETABLE_FUTURE;
+import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.getResult;
 
 public class RouterAsyncRpcClient extends RouterRpcClient{
   private static final Logger LOG =
       LoggerFactory.getLogger(RouterAsyncRpcClient.class);
-
-  public static final ThreadLocal<CompletableFuture<Object>> CUR_COMPLETABLE_FUTURE
-      = new ThreadLocal<>();
 
   /**
    * Create a router RPC client to manage remote procedure calls to NNs.
@@ -104,7 +103,7 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
       List<? extends FederationNamenodeContext> namenodes,
       boolean useObserver, Class<?> protocol,
       Method method, Object... params) throws IOException {
-    LOG.info("zj test : {}, {}, {}, {}", method.getName(), useObserver, namenodes.toString());
+    LOG.info("{} zj test : {}, {}, {}, {}", Thread.currentThread(), method.getName(), useObserver, namenodes.toString());
     CompletableFuture<Object> completableFuture =
         invokeMethodAsync(ugi, namenodes, useObserver, protocol, method, params);
     CUR_COMPLETABLE_FUTURE.set(completableFuture);

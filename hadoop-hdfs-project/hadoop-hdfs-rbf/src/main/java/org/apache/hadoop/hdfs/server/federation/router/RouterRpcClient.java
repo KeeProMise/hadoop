@@ -25,7 +25,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONN
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_IP_PROXY_USERS;
 import static org.apache.hadoop.hdfs.server.federation.fairness.RouterRpcFairnessConstants.CONCURRENT_NS;
 import static org.apache.hadoop.hdfs.server.federation.metrics.FederationRPCPerformanceMonitor.CONCURRENT;
-import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcClient.CUR_COMPLETABLE_FUTURE;
+import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.getResult;
 
 import java.io.EOFException;
 import java.io.FileNotFoundException;
@@ -1887,33 +1887,5 @@ public class RouterRpcClient {
       ioe = getCleanException(ioe);
     }
     return isUnavailableException(ioe);
-  }
-
-  //todo : test only
-  public Object result(UserGroupInformation ugi,
-                       List<? extends FederationNamenodeContext> namenodes,
-                       boolean useObserver, Class<?> protocol,
-                       Method method, Object... params) throws IOException {
-    Object o = invokeMethod(ugi, namenodes, useObserver, protocol, method, params);
-    if (!protocol.getName().equals(ClientProtocol.class.getName())) {
-      return o;
-    }else {
-      return getResult();
-    }
-  }
-
-  // todo : only test
-  public Object getResult() throws IOException {
-    try {
-      CompletableFuture<Object> completableFuture = CUR_COMPLETABLE_FUTURE.get();
-      System.out.println("zjcom3: " + completableFuture);
-      Object o =  completableFuture.get();
-      return o;
-    } catch (InterruptedException e) {
-    } catch (ExecutionException e) {
-      IOException ioe = (IOException) e.getCause();
-      throw ioe;
-    }
-    return null;
   }
 }

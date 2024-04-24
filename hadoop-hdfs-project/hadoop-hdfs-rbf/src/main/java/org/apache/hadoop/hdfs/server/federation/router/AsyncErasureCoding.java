@@ -15,8 +15,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.function.Function;
+import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.getCompletableFuture;
+import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.getResult;
+import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.setCurCompletableFuture;
 
 import static org.apache.hadoop.hdfs.server.federation.router.RouterRpcServer.merge;
 
@@ -143,29 +144,4 @@ public class AsyncErasureCoding extends ErasureCoding{
     setCurCompletableFuture(completableFuture);
     return (ECBlockGroupStats) getResult();
   }
-
-  private static CompletableFuture<Object> getCompletableFuture() {
-    return RouterAsyncRpcClient.CUR_COMPLETABLE_FUTURE.get();
-  }
-
-  private static void setCurCompletableFuture(
-      CompletableFuture<Object> completableFuture) {
-    RouterAsyncRpcClient.CUR_COMPLETABLE_FUTURE.set(completableFuture);
-  }
-
-  // todo : only test
-  public Object getResult() throws IOException {
-    try {
-      CompletableFuture<Object> completableFuture = RouterAsyncRpcClient.CUR_COMPLETABLE_FUTURE.get();
-      System.out.println("zjcom3: " + completableFuture);
-      Object o =  completableFuture.get();
-      return o;
-    } catch (InterruptedException e) {
-    } catch (ExecutionException e) {
-      IOException ioe = (IOException) e.getCause();
-      throw ioe;
-    }
-    return null;
-  }
-
 }

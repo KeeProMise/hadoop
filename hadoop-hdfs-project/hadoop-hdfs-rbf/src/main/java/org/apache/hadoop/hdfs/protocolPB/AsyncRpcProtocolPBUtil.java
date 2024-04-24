@@ -12,9 +12,11 @@ import java.util.concurrent.CompletionException;
 
 import static org.apache.hadoop.ipc.internal.ShadedProtobufHelper.ipc;
 
-public class AsyncRpcProtocolPBUtil {
+public final class AsyncRpcProtocolPBUtil {
   public static final ThreadLocal<CompletableFuture<Object>> completableFutureThreadLocal
       = new ThreadLocal<>();
+
+  private AsyncRpcProtocolPBUtil() {}
 
   public static  <T> AsyncGet<T, Exception> asyncIpc(
       ShadedProtobufHelper.IpcCall<T> call) throws IOException {

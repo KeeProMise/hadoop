@@ -98,12 +98,12 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ExecutionException;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import static org.apache.hadoop.hdfs.server.federation.router.FederationUtil.updateMountPointStatus;
+import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.getCompletableFuture;
+import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.getResult;
+import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.setCurCompletableFuture;
 
 public class RouterAsyncClientProtocol extends RouterClientProtocol {
   private static final Logger LOG =
@@ -1140,16 +1140,13 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
     getEZForPath(src);
     CompletableFuture<Object> completableFuture = getCompletableFuture();
     Path finalMountPath = mountPath;
-    completableFuture = completableFuture.thenApply(new Function<Object, Object>() {
-      @Override
-      public Object apply(Object o) {
-        EncryptionZone zone = (EncryptionZone) o;
-        if (zone == null) {
-          return finalMountPath;
-        } else {
-          Path zonePath = new Path(zone.getPath());
-          return zonePath.depth() > finalMountPath.depth() ? zonePath : finalMountPath;
-        }
+    completableFuture = completableFuture.thenApply(o -> {
+      EncryptionZone zone = (EncryptionZone) o;
+      if (zone == null) {
+        return finalMountPath;
+      } else {
+        Path zonePath = new Path(zone.getPath());
+        return zonePath.depth() > finalMountPath.depth() ? zonePath : finalMountPath;
       }
     });
     setCurCompletableFuture(completableFuture);
@@ -1200,29 +1197,5 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
   public BatchedRemoteIterator.BatchedEntries<CachePoolEntry> listCachePools(String prevKey)
       throws IOException {
     return routerAsyncCacheAdmin.listCachePools(prevKey);
-  }
-
-  private static CompletableFuture<Object> getCompletableFuture() {
-    return RouterAsyncRpcClient.CUR_COMPLETABLE_FUTURE.get();
-  }
-
-  private static void setCurCompletableFuture(
-      CompletableFuture<Object> completableFuture) {
-    RouterAsyncRpcClient.CUR_COMPLETABLE_FUTURE.set(completableFuture);
-  }
-
-  // todo : only test
-  public Object getResult() throws IOException {
-    try {
-      CompletableFuture<Object> completableFuture = RouterAsyncRpcClient.CUR_COMPLETABLE_FUTURE.get();
-      System.out.println("zjcom3: " + completableFuture);
-      Object o =  completableFuture.get();
-      return o;
-    } catch (InterruptedException e) {
-    } catch (ExecutionException e) {
-      IOException ioe = (IOException) e.getCause();
-      throw ioe;
-    }
-    return null;
   }
 }

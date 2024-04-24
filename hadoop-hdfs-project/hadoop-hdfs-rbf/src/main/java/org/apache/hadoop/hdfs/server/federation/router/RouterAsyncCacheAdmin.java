@@ -16,7 +16,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
+import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.getCompletableFuture;
+import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.getResult;
+import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.setCurCompletableFuture;
 
 public class RouterAsyncCacheAdmin extends RouterCacheAdmin{
   /** RPC server to receive client calls. */
@@ -105,29 +107,5 @@ public class RouterAsyncCacheAdmin extends RouterCacheAdmin{
     });
     setCurCompletableFuture(completableFuture);
     return (BatchedRemoteIterator.BatchedEntries<CachePoolEntry>) getResult();
-  }
-
-  private static CompletableFuture<Object> getCompletableFuture() {
-    return RouterAsyncRpcClient.CUR_COMPLETABLE_FUTURE.get();
-  }
-
-  private static void setCurCompletableFuture(
-      CompletableFuture<Object> completableFuture) {
-    RouterAsyncRpcClient.CUR_COMPLETABLE_FUTURE.set(completableFuture);
-  }
-
-  // todo : only test
-  public Object getResult() throws IOException {
-    try {
-      CompletableFuture<Object> completableFuture = RouterAsyncRpcClient.CUR_COMPLETABLE_FUTURE.get();
-      System.out.println("zjcom3: " + completableFuture);
-      Object o =  completableFuture.get();
-      return o;
-    } catch (InterruptedException e) {
-    } catch (ExecutionException e) {
-      IOException ioe = (IOException) e.getCause();
-      throw ioe;
-    }
-    return null;
   }
 }
