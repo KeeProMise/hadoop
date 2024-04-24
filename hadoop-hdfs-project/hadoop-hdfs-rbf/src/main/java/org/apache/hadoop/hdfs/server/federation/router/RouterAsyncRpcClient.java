@@ -417,7 +417,7 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
     for (final RemoteLocationContext loc : locations) {
       String ns = loc.getNameserviceId();
       acquirePermit(ns, ugi, remoteMethod, controller);
-      completableFuture = completableFuture.thenComposeAsync(args -> {
+      completableFuture = completableFuture.thenCompose(args -> {
         boolean complete = (boolean) args[1];
         if (complete) {
           return CompletableFuture.completedFuture(new Object[]{args[0], true});
@@ -425,7 +425,7 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
         return invokeSequentialToOneNs(originCall, originContext, ugi, m,
             thrownExceptions, remoteMethod, loc, expectedResultClass,
             expectedResultValue, results);
-      }, RouterRpcServer.getExecutor());
+      });
 
       releasePermit(ns, ugi, remoteMethod, controller);
     }
