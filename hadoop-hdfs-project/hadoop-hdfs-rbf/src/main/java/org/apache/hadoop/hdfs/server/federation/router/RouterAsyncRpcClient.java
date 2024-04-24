@@ -127,12 +127,16 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
     if (rpcMonitor != null) {
       rpcMonitor.incrProcessingOp();
     }
+    // transfer originCall & callerContext to worker threads of executor.
+    final Server.Call originCall = Server.getCurCall().get();
+    final CallerContext originContext = CallerContext.getCurrent();
 
     final long startProxyTime = Time.monotonicNow();
     Map<FederationNamenodeContext, IOException> ioes = new LinkedHashMap<>();
 
-    CompletableFuture<Object[]> completableFuture =
-        CompletableFuture.completedFuture(new Object[]{useObserver, false, false, null});
+    CompletableFuture<Object[]> completableFuture = CompletableFuture.supplyAsync(
+        () -> new Object[]{useObserver, false, false, null},
+        RouterRpcServer.getExecutor());
 
     for (FederationNamenodeContext namenode : namenodes) {
       completableFuture = completableFuture.thenCompose(args -> {
@@ -143,7 +147,7 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
           return CompletableFuture.completedFuture(
               new Object[]{shouldUseObserver, failover, complete, args[3]});
         }
-        return invokeAsyncTask(startProxyTime, ioes, ugi,
+        return invokeAsyncTask(originCall, originContext, startProxyTime, ioes, ugi,
             namenode, shouldUseObserver, failover, protocol, method, params);
       });
     }
@@ -186,6 +190,8 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   private CompletableFuture<Object[]> invokeAsyncTask(
+      final Server.Call originCall,
+      final CallerContext callerContext,
       final long startProxyTime,
       final Map<FederationNamenodeContext, IOException> ioes,
       final UserGroupInformation ugi,
@@ -193,6 +199,7 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
       boolean useObserver,
       boolean failover,
       final Class<?> protocol, final Method method, final Object... params) {
+    transferThreadLocalContext(originCall, callerContext);
     if (!useObserver && (namenode.getState() == FederationNamenodeServiceState.OBSERVER)) {
       return CompletableFuture.completedFuture(new Object[]{useObserver, failover, false, null});
     }
@@ -201,7 +208,7 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
     try {
       ConnectionContext connection = getConnection(ugi, nsId, rpcAddress, protocol);
       NameNodeProxiesClient.ProxyAndInfo<?> client = connection.getClient();
-      return invokeAsync(nsId, namenode, useObserver,
+      return invokeAsync(originCall, callerContext, nsId, namenode, useObserver,
           0, method, client.getProxy(), params)
           .handle((result, e) -> {
             connection.release();
@@ -310,17 +317,20 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   private CompletableFuture<Object> invokeAsync(
+      final Server.Call originCall,
+      final CallerContext callerContext,
       String nsId, FederationNamenodeContext namenode,
       Boolean listObserverFirst,
       int retryCount, final Method method,
       final Object obj, final Object... params) {
     try {
+      transferThreadLocalContext(originCall, callerContext);
       Client.setAsynchronousMode(true);
       method.invoke(obj, params);
       CompletableFuture<Object> completableFuture =
           AsyncRpcProtocolPBUtil.getCompletableFuture();
 
-      return completableFuture.handle((result, e) -> {
+      return completableFuture.handle((BiFunction<Object, Throwable, Object>) (result, e) -> {
         if (e == null) {
           return new Object[]{result, true};
         }
@@ -358,12 +368,12 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
           throw new CompletionException(new IOException(e));
         }
       }).thenCompose(o -> {
-        Object[] args = o;
+        Object[] args = (Object[]) o;
         boolean complete = (boolean) args[1];
         if (complete) {
           return CompletableFuture.completedFuture(args[0]);
         }
-        return invokeAsync(nsId, namenode,
+        return invokeAsync(originCall, callerContext, nsId, namenode,
             listObserverFirst, retryCount + 1, method, obj, params);
       });
     } catch (InvocationTargetException e) {
@@ -400,19 +410,22 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
     List<Object> results = new ArrayList<>();
     CompletableFuture<Object[]> completableFuture =
         CompletableFuture.completedFuture(new Object[] {null, false});
+    System.out.println("zjcom1: " + completableFuture);
+    final Server.Call originCall = Server.getCurCall().get();
+    final CallerContext originContext = CallerContext.getCurrent();
     // Invoke in priority order
     for (final RemoteLocationContext loc : locations) {
       String ns = loc.getNameserviceId();
       acquirePermit(ns, ugi, remoteMethod, controller);
-      completableFuture = completableFuture.thenCompose(args -> {
+      completableFuture = completableFuture.thenComposeAsync(args -> {
         boolean complete = (boolean) args[1];
         if (complete) {
           return CompletableFuture.completedFuture(new Object[]{args[0], true});
         }
-        return invokeSequentialToOneNs(ugi, m,
+        return invokeSequentialToOneNs(originCall, originContext, ugi, m,
             thrownExceptions, remoteMethod, loc, expectedResultClass,
             expectedResultValue, results);
-      });
+      }, RouterRpcServer.getExecutor());
 
       releasePermit(ns, ugi, remoteMethod, controller);
     }
@@ -438,17 +451,20 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
       // Return the first result, whether it is the value or not
       return new RemoteResult<>(locations.get(0), results.get(0));
     });
+    System.out.println("zjcom2: " + resultFuture);
     CUR_COMPLETABLE_FUTURE.set(resultFuture);
     return (RemoteResult) getResult();
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   private CompletableFuture<Object[]> invokeSequentialToOneNs(
+      final Server.Call originCall, final CallerContext originContext,
       final UserGroupInformation ugi, final Method m,
       final List<IOException> thrownExceptions,
       final RemoteMethod remoteMethod, final RemoteLocationContext loc,
       final Class expectedResultClass, final Object expectedResultValue,
       final List<Object> results) {
+    transferThreadLocalContext(originCall, originContext);
     String ns = loc.getNameserviceId();
     boolean isObserverRead = isObserverReadEligible(ns, m);
     try {
