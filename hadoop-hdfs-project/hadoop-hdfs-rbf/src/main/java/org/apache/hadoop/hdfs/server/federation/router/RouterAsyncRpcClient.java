@@ -411,8 +411,6 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
     CompletableFuture<Object[]> completableFuture =
         CompletableFuture.completedFuture(new Object[] {null, false});
     System.out.println("zjcom1: " + completableFuture);
-    final Server.Call originCall = Server.getCurCall().get();
-    final CallerContext originContext = CallerContext.getCurrent();
     // Invoke in priority order
     for (final RemoteLocationContext loc : locations) {
       String ns = loc.getNameserviceId();
@@ -422,7 +420,7 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
         if (complete) {
           return CompletableFuture.completedFuture(new Object[]{args[0], true});
         }
-        return invokeSequentialToOneNs(originCall, originContext, ugi, m,
+        return invokeSequentialToOneNs(ugi, m,
             thrownExceptions, remoteMethod, loc, expectedResultClass,
             expectedResultValue, results);
       });
@@ -458,13 +456,11 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   private CompletableFuture<Object[]> invokeSequentialToOneNs(
-      final Server.Call originCall, final CallerContext originContext,
       final UserGroupInformation ugi, final Method m,
       final List<IOException> thrownExceptions,
       final RemoteMethod remoteMethod, final RemoteLocationContext loc,
       final Class expectedResultClass, final Object expectedResultValue,
       final List<Object> results) {
-    transferThreadLocalContext(originCall, originContext);
     String ns = loc.getNameserviceId();
     boolean isObserverRead = isObserverReadEligible(ns, m);
     try {

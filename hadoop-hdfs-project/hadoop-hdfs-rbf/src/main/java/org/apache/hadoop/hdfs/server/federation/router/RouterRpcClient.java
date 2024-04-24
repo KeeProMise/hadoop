@@ -25,7 +25,6 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONN
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_IP_PROXY_USERS;
 import static org.apache.hadoop.hdfs.server.federation.fairness.RouterRpcFairnessConstants.CONCURRENT_NS;
 import static org.apache.hadoop.hdfs.server.federation.metrics.FederationRPCPerformanceMonitor.CONCURRENT;
-import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.getResult;
 
 import java.io.EOFException;
 import java.io.FileNotFoundException;
@@ -1131,9 +1130,6 @@ public class RouterRpcClient {
         Object[] params = remoteMethod.getParams(loc);
         Object result = invokeMethod(
             ugi, namenodes, isObserverRead, proto, m, params);
-        if (proto.getName().equals(ClientProtocol.class.getName())) {
-          result = getResult();
-        }
         // Check if the result is what we expected
         if (isExpectedClass(expectedResultClass, result) &&
             isExpectedValue(expectedResultValue, result)) {
@@ -1498,10 +1494,6 @@ public class RouterRpcClient {
         Object[] paramList = method.getParams(location);
         R result = (R) invokeMethod(
             ugi, namenodes, isObserverRead, proto, m, paramList);
-        if (proto.getName().equals(ClientProtocol.class.getName())) {
-          RemoteResult<T, R> remoteResult = (RemoteResult<T, R>) new RemoteResult<>(location, getResult());
-          return Collections.singletonList(remoteResult);
-        }
         RemoteResult<T, R> remoteResult = new RemoteResult<>(location, result);
         return Collections.singletonList(remoteResult);
       } catch (IOException ioe) {
@@ -1538,13 +1530,8 @@ public class RouterRpcClient {
           callables.add(
               () -> {
                 transferThreadLocalContext(originCall, originContext);
-                Object res =  invokeMethod(
+                return invokeMethod(
                     ugi, nnList, isObserverRead, proto, m, paramList);
-                if (proto.getName().equals(ClientProtocol.class.getName())) {
-                  return getResult();
-                }else {
-                  return res;
-                }
               });
         }
       } else {
@@ -1553,13 +1540,8 @@ public class RouterRpcClient {
         callables.add(
             () -> {
               transferThreadLocalContext(originCall, originContext);
-              Object res =  invokeMethod(
+              return invokeMethod(
                   ugi, namenodes, isObserverRead, proto, m, paramList);
-              if (proto.getName().equals(ClientProtocol.class.getName())) {
-                return getResult();
-              }else {
-                return res;
-              }
             });
       }
     }
