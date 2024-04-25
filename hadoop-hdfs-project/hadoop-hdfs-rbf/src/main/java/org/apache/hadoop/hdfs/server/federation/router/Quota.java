@@ -149,10 +149,9 @@ public class Quota {
     final List<RemoteLocation> quotaLocs = getValidQuotaLocations(path);
     RemoteMethod method = new RemoteMethod("getQuotaUsage",
         new Class<?>[] {String.class}, new RemoteParam());
-    Map<RemoteLocation, QuotaUsage> results = rpcClient.invokeConcurrent(
-        quotaLocs, method, true, false, QuotaUsage.class);
 
-    return results;
+    return rpcClient.invokeConcurrent(
+        quotaLocs, method, true, false, QuotaUsage.class);
   }
 
   /**

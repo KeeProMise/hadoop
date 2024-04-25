@@ -1979,7 +1979,6 @@ public class RouterClientProtocol implements ClientProtocol {
     rpcClient.invokeConcurrent(namespacesEligibleForObserverReads, method);
   }
 
-  //todo
   @Override
   public void satisfyStoragePolicy(String path) throws IOException {
     storagePolicy.satisfyStoragePolicy(path);
@@ -2490,5 +2489,17 @@ public class RouterClientProtocol implements ClientProtocol {
 
   public long getMountStatusTimeOut() {
     return mountStatusTimeOut;
+  }
+
+  public long getServerDefaultsLastUpdate() {
+    return serverDefaultsLastUpdate;
+  }
+
+  public long getServerDefaultsValidityPeriod() {
+    return serverDefaultsValidityPeriod;
+  }
+
+  public void setServerDefaultsLastUpdate(long serverDefaultsLastUpdate) {
+    this.serverDefaultsLastUpdate = serverDefaultsLastUpdate;
   }
 }

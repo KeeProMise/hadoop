@@ -23,6 +23,7 @@ import org.apache.hadoop.fs.BatchedRemoteIterator;
 import org.apache.hadoop.fs.CacheFlag;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
+import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.QuotaUsage;
@@ -84,6 +85,7 @@ import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -112,12 +114,42 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
   private final RouterSnapshot asyncSnapshotProto;
   private final AsyncErasureCoding asyncErasureCoding;
   private final RouterAsyncCacheAdmin routerAsyncCacheAdmin;
+  private volatile FsServerDefaults serverDefaults;
+  private final RouterAsyncStoragePolicy asyncstoragePolicy;
 
   RouterAsyncClientProtocol(Configuration conf, RouterRpcServer rpcServer) {
     super(conf, rpcServer);
     asyncSnapshotProto = new RouterAsyncSnapshot(rpcServer);
     asyncErasureCoding = new AsyncErasureCoding(rpcServer);
     routerAsyncCacheAdmin = new RouterAsyncCacheAdmin(rpcServer);
+    asyncstoragePolicy = new RouterAsyncStoragePolicy(rpcServer);
+  }
+
+  @Override
+  public FsServerDefaults getServerDefaults() throws IOException {
+    RouterRpcServer rpcServer = getRpcServer();
+    long serverDefaultsLastUpdate = getServerDefaultsLastUpdate();
+    long serverDefaultsValidityPeriod = getServerDefaultsValidityPeriod();
+    rpcServer.checkOperation(NameNode.OperationCategory.READ);
+    long now = Time.monotonicNow();
+    CompletableFuture<Object> completableFuture = null;
+    if ((serverDefaults == null) || (now - serverDefaultsLastUpdate
+        > serverDefaultsValidityPeriod)) {
+      RemoteMethod method = new RemoteMethod("getServerDefaults");
+      serverDefaults =
+          rpcServer.invokeAtAvailableNsAsync(method, FsServerDefaults.class);
+      completableFuture = getCompletableFuture();
+      completableFuture = completableFuture.thenApply(o -> {
+        serverDefaults = (FsServerDefaults) o;
+        RouterAsyncClientProtocol.super.setServerDefaultsLastUpdate(now);
+        return o;
+      });
+    } else {
+      completableFuture =
+          CompletableFuture.completedFuture(serverDefaults);
+    }
+    setCurCompletableFuture(completableFuture);
+    return (FsServerDefaults) getResult();
   }
 
   @Override
@@ -767,18 +799,46 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
     return (ReplicatedBlockStats) getResult();
   }
 
-  //todo
   @Override
-  public DatanodeInfo[] getDatanodeReport(
-      HdfsConstants.DatanodeReportType type) throws IOException {
-    return super.getDatanodeReport(type);
+  public DatanodeInfo[] getDatanodeReport(HdfsConstants.DatanodeReportType type)
+      throws IOException {
+    RouterRpcServer rpcServer = getRpcServer();
+    rpcServer.checkOperation(NameNode.OperationCategory.UNCHECKED);
+    return rpcServer.getDatanodeReportAsync(type, true, 0);
   }
 
-  // todo
   @Override
   public DatanodeStorageReport[] getDatanodeStorageReport(
       HdfsConstants.DatanodeReportType type) throws IOException {
-    return super.getDatanodeStorageReport(type);
+    RouterRpcServer rpcServer = getRpcServer();
+    rpcServer.checkOperation(NameNode.OperationCategory.UNCHECKED);
+
+    rpcServer.getDatanodeStorageReportMapAsync(type);
+    CompletableFuture<Object> completableFuture = getCompletableFuture();
+    completableFuture = completableFuture.thenApply(o -> {
+      Map<String, DatanodeStorageReport[]> dnSubcluster =
+          (Map<String, DatanodeStorageReport[]>) o;
+      return mergeDtanodeStorageReport(dnSubcluster);
+    });
+    setCurCompletableFuture(completableFuture);
+    return (DatanodeStorageReport[]) getResult();
+  }
+
+  public DatanodeStorageReport[] getDatanodeStorageReport(
+      HdfsConstants.DatanodeReportType type, boolean requireResponse, long timeOutMs)
+      throws IOException {
+    RouterRpcServer rpcServer = getRpcServer();
+    rpcServer.checkOperation(NameNode.OperationCategory.UNCHECKED);
+
+    rpcServer.getDatanodeStorageReportMapAsync(type, requireResponse, timeOutMs);
+    CompletableFuture<Object> completableFuture = getCompletableFuture();
+    completableFuture = completableFuture.thenApply(o -> {
+      Map<String, DatanodeStorageReport[]> dnSubcluster =
+          (Map<String, DatanodeStorageReport[]>) o;
+      return mergeDtanodeStorageReport(dnSubcluster);
+    });
+    setCurCompletableFuture(completableFuture);
+    return (DatanodeStorageReport[]) getResult();
   }
 
   @Override
@@ -1197,5 +1257,32 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
   public BatchedRemoteIterator.BatchedEntries<CachePoolEntry> listCachePools(String prevKey)
       throws IOException {
     return routerAsyncCacheAdmin.listCachePools(prevKey);
+  }
+
+  @Override
+  public void setStoragePolicy(String src, String policyName)
+      throws IOException {
+    asyncstoragePolicy.setStoragePolicy(src, policyName);
+  }
+
+  @Override
+  public BlockStoragePolicy[] getStoragePolicies() throws IOException {
+    return asyncstoragePolicy.getStoragePolicies();
+  }
+
+
+  @Override
+  public void unsetStoragePolicy(String src) throws IOException {
+    asyncstoragePolicy.unsetStoragePolicy(src);
+  }
+
+  @Override
+  public BlockStoragePolicy getStoragePolicy(String path) throws IOException {
+    return asyncstoragePolicy.getStoragePolicy(path);
+  }
+
+  @Override
+  public void satisfyStoragePolicy(String path) throws IOException {
+    asyncstoragePolicy.satisfyStoragePolicy(path);
   }
 }

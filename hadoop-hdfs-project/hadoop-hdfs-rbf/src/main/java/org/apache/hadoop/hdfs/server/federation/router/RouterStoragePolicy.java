@@ -58,7 +58,6 @@ public class RouterStoragePolicy {
     }
   }
 
-  // todo
   public BlockStoragePolicy[] getStoragePolicies() throws IOException {
     rpcServer.checkOperation(NameNode.OperationCategory.READ);
 
