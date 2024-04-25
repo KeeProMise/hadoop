@@ -139,6 +139,8 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
 
     for (FederationNamenodeContext namenode : namenodes) {
       completableFuture = completableFuture.thenCompose(args -> {
+        LOG.info("{} invokeAsyncTask {} {} {}",
+            Thread.currentThread(), namenode, method.getName(), params);
         Boolean shouldUseObserver = (Boolean) args[0];
         Boolean failover = (Boolean) args[1];
         Boolean complete = (Boolean) args[2];
