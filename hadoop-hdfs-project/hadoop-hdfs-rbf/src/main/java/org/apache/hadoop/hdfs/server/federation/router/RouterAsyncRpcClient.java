@@ -134,9 +134,8 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
     final long startProxyTime = Time.monotonicNow();
     Map<FederationNamenodeContext, IOException> ioes = new LinkedHashMap<>();
 
-    CompletableFuture<Object[]> completableFuture = CompletableFuture.supplyAsync(
-        () -> new Object[]{useObserver, false, false, null},
-        RouterRpcServer.getExecutor());
+    CompletableFuture<Object[]> completableFuture =
+        CompletableFuture.completedFuture(new Object[]{useObserver, false, false, null});
 
     for (FederationNamenodeContext namenode : namenodes) {
       completableFuture = completableFuture.thenCompose(args -> {
@@ -327,6 +326,9 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
       transferThreadLocalContext(originCall, callerContext);
       Client.setAsynchronousMode(true);
       method.invoke(obj, params);
+      // TODO: for test. because dfsclient and router may use main thread.
+      // so unset the value , ensure dfsclient rpc is sync.
+      Client.setAsynchronousMode(false);
       CompletableFuture<Object> completableFuture =
           AsyncRpcProtocolPBUtil.getCompletableFuture();
 
