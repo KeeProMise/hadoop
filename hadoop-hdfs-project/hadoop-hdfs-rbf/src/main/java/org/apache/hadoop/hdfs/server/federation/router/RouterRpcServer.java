@@ -978,6 +978,10 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
    */
   RemoteLocation getCreateLocation(final String src) throws IOException {
     final List<RemoteLocation> locations = getLocationsForPath(src, true);
+    if (router.isEnableAsync()) {
+      getCreateLocationAsync(src, locations);
+      return (RemoteLocation) getResult();
+    }
     return getCreateLocation(src, locations);
   }
 
@@ -1014,6 +1018,47 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
     return createLocation;
   }
 
+  RemoteLocation getCreateLocationAsync(
+      final String src, final List<RemoteLocation> locations)
+      throws IOException {
+
+    if (locations == null || locations.isEmpty()) {
+      throw new IOException("Cannot get locations to create " + src);
+    }
+
+    RemoteLocation createLocation = locations.get(0);
+    CompletableFuture<Object> completableFuture =
+        CompletableFuture.completedFuture(createLocation);
+    if (locations.size() > 1) {
+      completableFuture = completableFuture.thenCompose(o -> {
+        try {
+          getExistingLocationAsync(src, locations);
+          return getCompletableFuture().thenApply(existingLocation -> {
+            if (existingLocation != null) {
+              LOG.debug("{} already exists in {}.", src, existingLocation);
+              return existingLocation;
+            }
+            return createLocation;
+          });
+        } catch (IOException e) {
+          throw new CompletionException(e);
+        }
+      }).handle((o, e) -> {
+        if (e == null) {
+          return o;
+        }
+        Throwable cause = e.getCause();
+        if (cause instanceof FileNotFoundException) {
+          return o;
+        }
+        throw new CompletionException(cause);
+      });
+    }
+    setCurCompletableFuture(completableFuture);
+    return (RemoteLocation) getResult();
+  }
+
+
   /**
    * Gets the remote location where the file exists.
    * @param src the name of file.
@@ -1033,6 +1078,27 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
       }
     }
     return null;
+  }
+
+  private RemoteLocation getExistingLocationAsync(
+      String src, List<RemoteLocation> locations) throws IOException {
+    RemoteMethod method = new RemoteMethod("getFileInfo",
+        new Class<?>[] {String.class}, new RemoteParam());
+    rpcClient.invokeConcurrent(
+        locations, method, true, false, HdfsFileStatus.class);
+    CompletableFuture<Object> completableFuture = getCompletableFuture();
+    completableFuture = completableFuture.thenApply(o -> {
+      Map<RemoteLocation, HdfsFileStatus> results =
+          (Map<RemoteLocation, HdfsFileStatus>) o;
+      for (RemoteLocation loc : locations) {
+        if (results.get(loc) != null) {
+          return loc;
+        }
+      }
+      return null;
+    });
+    setCurCompletableFuture(completableFuture);
+    return (RemoteLocation) getResult();
   }
 
   @Override // ClientProtocol

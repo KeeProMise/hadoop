@@ -100,6 +100,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 
 import static org.apache.hadoop.hdfs.server.federation.router.FederationUtil.updateMountPointStatus;
@@ -163,6 +164,7 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
     rpcServer.checkOperation(NameNode.OperationCategory.WRITE);
 
     CompletableFuture<Object> completableFuture = null;
+    final Throwable[] throwable = new Throwable[1];
     if (createParent && rpcServer.isPathAll(src)) {
       int index = src.lastIndexOf(Path.SEPARATOR);
       String parent = src.substring(0, index);
@@ -170,6 +172,10 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
       FsPermission parentPermissions = getParentPermission(masked);
       mkdirs(parent, parentPermissions, createParent);
       completableFuture = getCompletableFuture();
+      completableFuture = completableFuture.exceptionally(e -> {
+        throwable[0] = e.getCause();
+        throw new CompletionException(e.getCause());
+      });
     }
 
     if (completableFuture == null) {
@@ -182,32 +188,48 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
             String.class, String.class},
         new RemoteParam(), masked, clientName, flag, createParent,
         replication, blockSize, supportedVersions, ecPolicyName, storagePolicy);
+    final RemoteLocation[] createLocation = new RemoteLocation[1];
     final List<RemoteLocation> locations =
         rpcServer.getLocationsForPath(src, true);
     completableFuture = completableFuture.thenCompose(o -> {
-      RemoteLocation createLocation = null;
       try {
-        createLocation =
-            rpcServer.getCreateLocation(src, locations);
-        rpcClient.invokeSingle(createLocation, method,
+        rpcServer.getCreateLocationAsync(src, locations);
+        return getCompletableFuture();
+      } catch (IOException e) {
+        throw new CompletionException(e);
+      }
+    }).thenCompose((Function<Object, CompletionStage<Object>>) o -> {
+      createLocation[0] = (RemoteLocation) o;
+      try {
+        rpcClient.invokeSingle(createLocation[0], method,
             HdfsFileStatus.class);
-        RemoteLocation finalCreateLocation = createLocation;
         return getCompletableFuture().thenApply(o1 -> {
           HdfsFileStatus status = (HdfsFileStatus) o1;
-          status.setNamespace(finalCreateLocation.getNameserviceId());
+          status.setNamespace(createLocation[0].getNameserviceId());
           return status;
         });
-      } catch (IOException ioe) {
-        try {
-          final List<RemoteLocation> newLocations = checkFaultTolerantRetry(
-              method, src, ioe, createLocation, locations);
-          rpcClient.invokeSequential(
-              newLocations, method, HdfsFileStatus.class, null);
-          return getCompletableFuture();
-        } catch (IOException e) {
-          throw new CompletionException(e);
-        }
+      } catch (IOException e) {
+        throw new CompletionException(e);
       }
+    }).exceptionally(Throwable::getCause).thenCompose(o -> {
+      if (throwable[0] != null) {
+        throw new CompletionException(throwable[0]);
+      }
+      if (o instanceof Throwable) {
+        if (o instanceof IOException) {
+          try {
+            final List<RemoteLocation> newLocations = checkFaultTolerantRetry(
+                method, src, (IOException) o, createLocation[0], locations);
+            rpcClient.invokeSequential(
+                newLocations, method, HdfsFileStatus.class, null);
+            return getCompletableFuture();
+          } catch (IOException e) {
+            throw new CompletionException(e);
+          }
+        }
+        throw new CompletionException((Throwable) o);
+      }
+      return CompletableFuture.completedFuture(o);
     });
     setCurCompletableFuture(completableFuture);
     return (HdfsFileStatus) getResult();
