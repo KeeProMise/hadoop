@@ -431,22 +431,24 @@ public class ProtobufRpcEngine2 implements RpcEngine {
         this.server = CURRENT_CALL_INFO.get().getServer();
         this.call = Server.getCurCall().get();
         this.methodName = CURRENT_CALL_INFO.get().getMethodName();
-        this.setupTime = Time.now();
+        this.setupTime = Time.monotonicNowNanos();
       }
 
       @Override
       public void setResponse(Message message) {
-        long processingTime = Time.now() - setupTime;
-        call.setDeferredResponse(RpcWritable.wrap(message));
+        long processingTime =
+            Time.monotonicNow() - setupTime / Time.NANOSECONDS_PER_MILLISECOND;
+        call.setDeferredResponse(RpcWritable.wrap(message), setupTime);
         server.updateDeferredMetrics(methodName, processingTime);
       }
 
       @Override
       public void error(Throwable t) {
-        long processingTime = Time.now() - setupTime;
+        long processingTime =
+            Time.monotonicNow()  - setupTime / Time.NANOSECONDS_PER_MILLISECOND;
         String detailedMetricsName = t.getClass().getSimpleName();
         server.updateDeferredMetrics(detailedMetricsName, processingTime);
-        call.setDeferredError(t);
+        call.setDeferredError(t, setupTime);
       }
     }
 
