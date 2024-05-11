@@ -46,8 +46,8 @@ public final class AsyncRpcProtocolPBUtil {
         throw new CompletionException(e);
       }
     }).handle((result, e) -> {
-      LOG.info("zjtest async response by [{}], call: {}, CallerContext: {}",
-          Thread.currentThread().getName(), originCall, originContext);
+      LOG.info("zjtest async response by [{}], callback: {}, CallerContext: {}",
+          Thread.currentThread().getName(), callback, originContext);
       if (e == null) {
         Message value = null;
         try {

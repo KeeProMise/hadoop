@@ -384,9 +384,6 @@ public class ProtobufRpcEngine implements RpcEngine {
    */
   public static class Server extends ProtobufRpcEngine2.Server {
 
-    static final ThreadLocal<ProtobufRpcEngineCallback> currentCallback =
-        new ThreadLocal<>();
-
     static class ProtobufRpcEngineCallbackImpl
         implements ProtobufRpcEngineCallback {
 
@@ -397,8 +394,9 @@ public class ProtobufRpcEngine implements RpcEngine {
 
       public ProtobufRpcEngineCallbackImpl() {
         this.server = CURRENT_CALL_INFO.get().getServer();
-        this.call = Server.getCurCall().get();
         this.methodName = CURRENT_CALL_INFO.get().getMethodName();
+        this.call = Server.getCurCall().get();
+        this.call.deferResponse();
         this.setupTime = Time.monotonicNowNanos();
       }
 
@@ -422,9 +420,7 @@ public class ProtobufRpcEngine implements RpcEngine {
 
     @InterfaceStability.Unstable
     public static ProtobufRpcEngineCallback registerForDeferredResponse() {
-      ProtobufRpcEngineCallback callback = new ProtobufRpcEngineCallbackImpl();
-      currentCallback.set(callback);
-      return callback;
+      return new ProtobufRpcEngineCallbackImpl();
     }
 
     /**
@@ -484,11 +480,7 @@ public class ProtobufRpcEngine implements RpcEngine {
         CURRENT_CALL_INFO.set(new CallInfo(server, methodName));
         currentCall.setDetailedMetricsName(methodName);
         result = service.callBlockingMethod(methodDescriptor, null, param);
-        // Check if this needs to be a deferred response,
-        // by checking the ThreadLocal callback being set
-        if (currentCallback.get() != null) {
-          currentCall.deferResponse();
-          currentCallback.set(null);
+        if (currentCall.isResponseDeferred()) {
           return null;
         }
       } catch (ServiceException e) {
