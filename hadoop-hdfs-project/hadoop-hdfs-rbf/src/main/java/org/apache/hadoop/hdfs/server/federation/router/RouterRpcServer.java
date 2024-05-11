@@ -58,6 +58,8 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.HAUtil;
 import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
+import org.apache.hadoop.hdfs.protocolPB.RouterGetUserMappingsProtocolServerSideTranslatorPB;
+import org.apache.hadoop.hdfs.protocolPB.RouterRefreshUserMappingsProtocolServerSideTranslatorPB;
 import org.apache.hadoop.thirdparty.com.google.common.cache.CacheBuilder;
 import org.apache.hadoop.thirdparty.com.google.common.cache.CacheLoader;
 import org.apache.hadoop.thirdparty.com.google.common.cache.LoadingCache;
@@ -306,13 +308,13 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
         .newReflectiveBlockingService(namenodeProtocolXlator);
 
     RefreshUserMappingsProtocolServerSideTranslatorPB refreshUserMappingXlator =
-        new RefreshUserMappingsProtocolServerSideTranslatorPB(this);
+        new RouterRefreshUserMappingsProtocolServerSideTranslatorPB(this);
     BlockingService refreshUserMappingService =
         RefreshUserMappingsProtocolProtos.RefreshUserMappingsProtocolService.
         newReflectiveBlockingService(refreshUserMappingXlator);
 
     GetUserMappingsProtocolServerSideTranslatorPB getUserMappingXlator =
-        new GetUserMappingsProtocolServerSideTranslatorPB(this);
+        new RouterGetUserMappingsProtocolServerSideTranslatorPB(this);
     BlockingService getUserMappingService =
         GetUserMappingsProtocolProtos.GetUserMappingsProtocolService.
         newReflectiveBlockingService(getUserMappingXlator);
@@ -2101,5 +2103,9 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
         throws Exception {
       return executorService.submit(() -> load(type));
     }
+  }
+
+  public boolean isAsync() {
+    return router.isEnableAsync();
   }
 }

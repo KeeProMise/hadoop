@@ -876,4 +876,7 @@ public class Router extends CompositeService implements
     this.conf = conf;
   }
 
+  public boolean isEnableAsync() {
+    return true;
+  }
 }
