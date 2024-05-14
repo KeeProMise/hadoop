@@ -447,6 +447,7 @@ public class ProtobufRpcEngine2 implements RpcEngine {
         String detailedMetricsName = t.getClass().getSimpleName();
         server.updateDeferredMetrics(detailedMetricsName, processingTime);
         call.setDeferredError(t, setupTime);
+        LOG.info("zjtest {} error:", this.toString(), t);
       }
 
       @Override
