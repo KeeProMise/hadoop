@@ -65,6 +65,10 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.HAUtil;
 import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
+import org.apache.hadoop.hdfs.protocolPB.RouterClientNamenodeProtocolServerSideTranslatorPB;
+import org.apache.hadoop.hdfs.protocolPB.RouterGetUserMappingsProtocolServerSideTranslatorPB;
+import org.apache.hadoop.hdfs.protocolPB.RouterNamenodeProtocolServerSideTranslatorPB;
+import org.apache.hadoop.hdfs.protocolPB.RouterRefreshUserMappingsProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdfs.protocolPB.RouterClientProtocolTranslatorPB;
 import org.apache.hadoop.thirdparty.com.google.common.cache.CacheBuilder;
 import org.apache.hadoop.thirdparty.com.google.common.cache.CacheLoader;
@@ -319,25 +323,30 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
     RPC.setProtocolEngine(this.conf, ClientNamenodeProtocolPB.class,
         ProtobufRpcEngine2.class);
 
-    ClientNamenodeProtocolServerSideTranslatorPB
-        clientProtocolServerTranslator =
-            new ClientNamenodeProtocolServerSideTranslatorPB(this);
+    ClientNamenodeProtocolServerSideTranslatorPB clientProtocolServerTranslator;
+    if (isAsync()) {
+      clientProtocolServerTranslator =
+          new RouterClientNamenodeProtocolServerSideTranslatorPB(this);
+    } else {
+      clientProtocolServerTranslator =
+          new ClientNamenodeProtocolServerSideTranslatorPB(this);
+    }
     BlockingService clientNNPbService = ClientNamenodeProtocol
         .newReflectiveBlockingService(clientProtocolServerTranslator);
 
     NamenodeProtocolServerSideTranslatorPB namenodeProtocolXlator =
-        new NamenodeProtocolServerSideTranslatorPB(this);
+        new RouterNamenodeProtocolServerSideTranslatorPB(this);
     BlockingService nnPbService = NamenodeProtocolService
         .newReflectiveBlockingService(namenodeProtocolXlator);
 
     RefreshUserMappingsProtocolServerSideTranslatorPB refreshUserMappingXlator =
-        new RefreshUserMappingsProtocolServerSideTranslatorPB(this);
+        new RouterRefreshUserMappingsProtocolServerSideTranslatorPB(this);
     BlockingService refreshUserMappingService =
         RefreshUserMappingsProtocolProtos.RefreshUserMappingsProtocolService.
         newReflectiveBlockingService(refreshUserMappingXlator);
 
     GetUserMappingsProtocolServerSideTranslatorPB getUserMappingXlator =
-        new GetUserMappingsProtocolServerSideTranslatorPB(this);
+        new RouterGetUserMappingsProtocolServerSideTranslatorPB(this);
     BlockingService getUserMappingService =
         GetUserMappingsProtocolProtos.GetUserMappingsProtocolService.
         newReflectiveBlockingService(getUserMappingXlator);
@@ -1300,13 +1309,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
   DatanodeInfo[] getCachedDatanodeReport(DatanodeReportType type)
       throws IOException {
     try {
-      DatanodeInfo[] dns = this.dnCache.get(type);
-      if (dns == null) {
-        LOG.debug("Get null DN report from cache");
-        dns = getCachedDatanodeReportImpl(type);
-        this.dnCache.put(type, dns);
-      }
-      return dns;
+      return this.dnCache.get(type);
     } catch (ExecutionException e) {
       LOG.error("Cannot get the DN report for {}", type, e);
       Throwable cause = e.getCause();
@@ -2378,5 +2381,9 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
         throws Exception {
       return executorService.submit(() -> load(type));
     }
+  }
+
+  public boolean isAsync() {
+    return router.isEnableAsync();
   }
 }
