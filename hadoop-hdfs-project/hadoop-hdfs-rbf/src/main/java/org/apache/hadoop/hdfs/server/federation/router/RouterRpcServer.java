@@ -2325,6 +2325,29 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
     return toArray(datanodes, DatanodeInfo.class);
   }
 
+  public DatanodeInfo[] getSlowDatanodeReportAsync(
+      boolean requireResponse, long timeOutMs) throws IOException {
+    checkOperation(OperationCategory.UNCHECKED);
+
+    Map<String, DatanodeInfo> datanodesMap = new LinkedHashMap<>();
+    RemoteMethod method = new RemoteMethod("getSlowDatanodeReport");
+
+    Set<FederationNamespaceInfo> nss = namenodeResolver.getNamespaces();
+    rpcClient.invokeConcurrent(nss, method, requireResponse, false,
+        timeOutMs, DatanodeInfo[].class);
+    CompletableFuture<Object> completableFuture = getCompletableFuture();
+    completableFuture = completableFuture.thenApply(o -> {
+      Map<FederationNamespaceInfo, DatanodeInfo[]> results =
+          (Map<FederationNamespaceInfo, DatanodeInfo[]>) o;
+      updateDnMap(results, datanodesMap);
+      // Map -> Array
+      Collection<DatanodeInfo> datanodes = datanodesMap.values();
+      return toArray(datanodes, DatanodeInfo.class);
+    });
+    setCurCompletableFuture(completableFuture);
+    return null;
+  }
+
   private void updateDnMap(Map<FederationNamespaceInfo, DatanodeInfo[]> results,
       Map<String, DatanodeInfo> datanodesMap) {
     for (Entry<FederationNamespaceInfo, DatanodeInfo[]> entry :

@@ -1984,7 +1984,6 @@ public class RouterClientProtocol implements ClientProtocol {
     storagePolicy.satisfyStoragePolicy(path);
   }
 
-  //todo
   @Override
   public DatanodeInfo[] getSlowDatanodeReport() throws IOException {
     rpcServer.checkOperation(NameNode.OperationCategory.UNCHECKED);

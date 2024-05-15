@@ -1010,10 +1010,73 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
     return (RollingUpgradeInfo) getResult();
   }
 
-  // todo
   @Override
   public HdfsFileStatus getFileInfo(String src) throws IOException {
-    return super.getFileInfo(src);
+    RouterRpcServer rpcServer = getRpcServer();
+    RouterRpcClient rpcClient = getRpcClient();
+    FileSubclusterResolver subclusterResolver = getSubclusterResolver();
+    rpcServer.checkOperation(NameNode.OperationCategory.READ);
+
+    IOException noLocationException = null;
+    try {
+      final List<RemoteLocation> locations =
+          rpcServer.getLocationsForPath(src, false, false);
+      RemoteMethod method = new RemoteMethod("getFileInfo",
+          new Class<?>[] {String.class}, new RemoteParam());
+
+      // If it's a directory, we check in all locations
+      if (rpcServer.isPathAll(src)) {
+        getFileInfoAll(locations, method);
+      } else {
+        // Check for file information sequentially
+        rpcClient.invokeSequential(locations,
+            method, HdfsFileStatus.class, null);
+      }
+    } catch (NoLocationException | RouterResolveException e) {
+      noLocationException = e;
+    }
+
+    CompletableFuture<Object> completableFuture = getCompletableFuture();
+    IOException finalNoLocationException = noLocationException;
+    completableFuture = completableFuture.thenApply(o -> {
+      HdfsFileStatus ret = (HdfsFileStatus) o;
+      // If there is no real path, check mount points
+      if (ret == null) {
+        List<String> children = null;
+        try {
+          children = subclusterResolver.getMountPoints(src);
+        } catch (IOException e) {
+          throw new CompletionException(e);
+        }
+        if (children != null && !children.isEmpty()) {
+          Map<String, Long> dates = getMountPointDates(src);
+          long date = 0;
+          if (dates != null && dates.containsKey(src)) {
+            date = dates.get(src);
+          }
+          ret = getMountPointStatus(src, children.size(), date, false);
+        } else if (children != null) {
+          // The src is a mount point, but there are no files or directories
+          ret = getMountPointStatus(src, 0, 0, false);
+        }
+      }
+
+      // Can't find mount point for path and the path didn't contain any sub monit points,
+      // throw the NoLocationException to client.
+      if (ret == null && finalNoLocationException != null) {
+        throw new CompletionException(finalNoLocationException);
+      }
+
+      return ret;
+    });
+    setCurCompletableFuture(completableFuture);
+    return null;
+  }
+
+  private HdfsFileStatus getFileInfoAll(
+      final List<RemoteLocation> locations,
+      final RemoteMethod method) throws IOException {
+    return getFileInfoAll(locations, method, -1);
   }
 
   @Override
@@ -1306,5 +1369,38 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
   @Override
   public void satisfyStoragePolicy(String path) throws IOException {
     asyncstoragePolicy.satisfyStoragePolicy(path);
+  }
+
+  @Override
+  public DatanodeInfo[] getSlowDatanodeReport() throws IOException {
+    RouterRpcServer rpcServer = getRpcServer();
+    rpcServer.checkOperation(NameNode.OperationCategory.UNCHECKED);
+    return rpcServer.getSlowDatanodeReportAsync(true, 0);
+  }
+
+  @Override
+  public boolean setReplication(String src, short replication)
+      throws IOException {
+    RouterRpcServer rpcServer = getRpcServer();
+    RouterRpcClient rpcClient = getRpcClient();
+    rpcServer.checkOperation(NameNode.OperationCategory.WRITE);
+
+    List<RemoteLocation> locations = rpcServer.getLocationsForPath(src, true);
+    RemoteMethod method = new RemoteMethod("setReplication",
+        new Class<?>[] {String.class, short.class}, new RemoteParam(),
+        replication);
+    if (rpcServer.isInvokeConcurrent(src)) {
+      rpcClient.invokeConcurrent(locations, method, Boolean.class);
+      CompletableFuture<Object> completableFuture = getCompletableFuture();
+      completableFuture = completableFuture.thenApply(o -> {
+        Map<RemoteLocation, Boolean> results = (Map<RemoteLocation, Boolean>) o;
+        return !results.containsValue(false);
+      });
+      setCurCompletableFuture(completableFuture);
+    } else {
+      rpcClient.invokeSequential(locations, method, Boolean.class,
+          Boolean.TRUE);
+    }
+    return false;
   }
 }

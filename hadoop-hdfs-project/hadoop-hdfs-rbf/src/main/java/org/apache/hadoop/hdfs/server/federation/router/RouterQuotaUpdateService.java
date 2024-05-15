@@ -99,6 +99,9 @@ public class RouterQuotaUpdateService extends PeriodicService {
         // This is because mount table does not have mtime.
         // For other mount entry get current quota usage
         HdfsFileStatus ret = this.rpcServer.getFileInfo(src);
+        if (rpcServer.isAsync()) {
+          ret = (HdfsFileStatus) RouterAsyncRpcUtil.getResult();
+        }
         if (ret == null || ret.getModificationTime() == 0) {
           long[] zeroConsume = new long[StorageType.values().length];
           currentQuotaUsage =

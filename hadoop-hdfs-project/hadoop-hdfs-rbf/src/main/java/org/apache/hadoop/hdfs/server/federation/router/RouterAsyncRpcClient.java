@@ -414,7 +414,6 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
     List<Object> results = new ArrayList<>();
     CompletableFuture<Object[]> completableFuture =
         CompletableFuture.completedFuture(new Object[] {null, false});
-    System.out.println("zjcom1: " + completableFuture);
     // Invoke in priority order
     for (final RemoteLocationContext loc : locations) {
       String ns = loc.getNameserviceId();

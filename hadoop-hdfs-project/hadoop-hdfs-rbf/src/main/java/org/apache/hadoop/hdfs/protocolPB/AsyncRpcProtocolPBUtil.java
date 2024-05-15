@@ -1,5 +1,6 @@
 package org.apache.hadoop.hdfs.protocolPB;
 
+import org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil;
 import org.apache.hadoop.hdfs.server.federation.router.RouterRpcServer;
 import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.ipc.Client;
@@ -65,13 +66,15 @@ public final class AsyncRpcProtocolPBUtil {
       Server.getCurCall().set(originCall);
       CallerContext.setCurrent(originContext);
       try {
-        return CompletableFuture.completedFuture(req.req());
+        req.req();
+        return (CompletableFuture<T>)RouterAsyncRpcUtil.getCompletableFuture();
+//        return CompletableFuture.completedFuture(req.req());
       } catch (Exception e) {
         throw new CompletionException(e);
       }
     }).handle((result, e) -> {
-      LOG.info("zjtest async response by [{}], callback: {}, CallerContext: {}",
-          Thread.currentThread().getName(), callback, originContext);
+      LOG.info("zjtest async response by [{}], callback: {}, CallerContext: {}, result: [{}]",
+          Thread.currentThread().getName(), callback, originContext, result);
       if (e == null) {
         Message value = null;
         try {

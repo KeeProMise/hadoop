@@ -3,7 +3,10 @@ package org.apache.hadoop.hdfs.server.federation.router;
 import org.apache.hadoop.hdfs.server.federation.resolver.ActiveNamenodeResolver;
 import org.apache.hadoop.hdfs.server.federation.resolver.FederationNamespaceInfo;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
+import org.apache.hadoop.security.Groups;
+import org.apache.hadoop.security.RefreshUserMappingsProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.tools.GetUserMappingsProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,12 +40,45 @@ public class RouterAsyncUserProtocol extends RouterUserProtocol{
   }
 
   @Override
+  public void refreshUserToGroupsMappings() throws IOException {
+    LOG.debug("Refresh user groups mapping in Router.");
+    rpcServer.checkOperation(NameNode.OperationCategory.UNCHECKED);
+    Set<FederationNamespaceInfo> nss = namenodeResolver.getNamespaces();
+    if (nss.isEmpty()) {
+      Groups.getUserToGroupsMappingService().refresh();
+      setCurCompletableFuture(CompletableFuture.completedFuture(null));
+    } else {
+      RemoteMethod method = new RemoteMethod(RefreshUserMappingsProtocol.class,
+          "refreshUserToGroupsMappings");
+      rpcClient.invokeConcurrent(nss, method);
+    }
+  }
+
+  @Override
+  public void refreshSuperUserGroupsConfiguration() throws IOException {
+    LOG.debug("Refresh superuser groups configuration in Router.");
+    rpcServer.checkOperation(NameNode.OperationCategory.UNCHECKED);
+    Set<FederationNamespaceInfo> nss = namenodeResolver.getNamespaces();
+    if (nss.isEmpty()) {
+      ProxyUsers.refreshSuperUserGroupsConfiguration();
+      setCurCompletableFuture(CompletableFuture.completedFuture(null));
+    } else {
+      RemoteMethod method = new RemoteMethod(RefreshUserMappingsProtocol.class,
+          "refreshSuperUserGroupsConfiguration");
+      rpcClient.invokeConcurrent(nss, method);
+    }
+  }
+
+  @Override
   public String[] getGroupsForUser(String user) throws IOException {
     LOG.debug("Getting groups for user {}", user);
     rpcServer.checkOperation(NameNode.OperationCategory.UNCHECKED);
     Set<FederationNamespaceInfo> nss = namenodeResolver.getNamespaces();
     if (nss.isEmpty()) {
-      return UserGroupInformation.createRemoteUser(user).getGroupNames();
+      setCurCompletableFuture(
+          CompletableFuture
+              .completedFuture(UserGroupInformation.createRemoteUser(user)
+                  .getGroupNames()));
     } else {
       RemoteMethod method = new RemoteMethod(GetUserMappingsProtocol.class,
           "getGroupsForUser", new Class<?>[] {String.class}, user);
@@ -54,7 +90,7 @@ public class RouterAsyncUserProtocol extends RouterUserProtocol{
         return merge(results, String.class);
       });
       setCurCompletableFuture(completableFuture);
-      return (String[]) getResult();
     }
+    return null;
   }
 }
