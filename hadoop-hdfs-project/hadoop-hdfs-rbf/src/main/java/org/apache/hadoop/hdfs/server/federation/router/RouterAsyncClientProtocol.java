@@ -1126,7 +1126,15 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
   public void setQuota(
       String path, long namespaceQuota, long storagespaceQuota,
       StorageType type) throws IOException {
-    super.setQuota(path, namespaceQuota, storagespaceQuota, type);
+    RouterRpcServer rpcServer = getRpcServer();
+    rpcServer.getQuotaModule()
+        .setQuota(path, namespaceQuota, storagespaceQuota, type, true);
+  }
+
+  @Override
+  public QuotaUsage getQuotaUsage(String path) throws IOException {
+    RouterRpcServer rpcServer = getRpcServer();
+    return rpcServer.getQuotaModule().getQuotaUsage(path);
   }
 
   // todo

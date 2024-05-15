@@ -1821,7 +1821,6 @@ public class RouterClientProtocol implements ClientProtocol {
         .setQuota(path, namespaceQuota, storagespaceQuota, type, true);
   }
 
-  // todo
   @Override
   public QuotaUsage getQuotaUsage(String path) throws IOException {
     return rpcServer.getQuotaModule().getQuotaUsage(path);

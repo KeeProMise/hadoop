@@ -360,7 +360,7 @@ public class Quota {
    * @return List of quota remote locations.
    * @throws IOException
    */
-  private List<RemoteLocation> getQuotaRemoteLocations(String path)
+  protected List<RemoteLocation> getQuotaRemoteLocations(String path)
       throws IOException {
     List<RemoteLocation> locations = new ArrayList<>();
     RouterQuotaManager manager = this.router.getQuotaManager();
