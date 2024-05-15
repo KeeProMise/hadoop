@@ -2423,8 +2423,7 @@ public class RouterClientProtocol implements ClientProtocol {
    *         subclusters else false in all other scenarios.
    * @throws IOException if unable to get the file status.
    */
-  @VisibleForTesting
-  boolean isMultiDestDirectory(String src) throws IOException {
+  public boolean isMultiDestDirectory(String src) throws IOException {
     try {
       if (rpcServer.isPathAll(src)) {
         List<RemoteLocation> locations;

@@ -7,6 +7,9 @@ import java.util.concurrent.ExecutionException;
 public final class RouterAsyncRpcUtil {
   public static final ThreadLocal<CompletableFuture<Object>> CUR_COMPLETABLE_FUTURE
       = new ThreadLocal<>();
+  private static final Boolean BOOLEAN_RESULT = false;
+  private static final Long LONG_RESULT = -1l;
+  private static final Object NULL_RESULT = null;
 
   public static  <T> CompletableFuture<T> asyncInvoke(
       Invoker<T> invoker) throws IOException {
@@ -35,6 +38,18 @@ public final class RouterAsyncRpcUtil {
       throw ioe;
     }
     return null;
+  }
+
+  public static <T> T asyncReturn(Class<T> clazz) {
+    if (clazz == null) {
+      return null;
+    }
+    if (clazz.equals(Boolean.class)) {
+      return (T) BOOLEAN_RESULT;
+    } else if (clazz.equals(Long.class)) {
+      return (T) LONG_RESULT;
+    }
+    return (T) NULL_RESULT;
   }
 
   public interface Invoker<T> {

@@ -69,6 +69,7 @@ import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReportListing;
 import org.apache.hadoop.hdfs.protocol.SnapshotStatus;
 import org.apache.hadoop.hdfs.protocol.SnapshottableDirectoryStatus;
+import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
 import org.apache.hadoop.hdfs.protocol.ZoneReencryptionStatus;
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
@@ -1410,5 +1411,36 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
           Boolean.TRUE);
     }
     return false;
+  }
+
+  public boolean isMultiDestDirectory(String src) throws IOException {
+    RouterRpcServer rpcServer = getRpcServer();
+    RouterRpcClient rpcClient = getRpcClient();
+    try {
+      if (rpcServer.isPathAll(src)) {
+        List<RemoteLocation> locations;
+        locations = rpcServer.getLocationsForPath(src, false, false);
+        RemoteMethod method = new RemoteMethod("getFileInfo",
+            new Class<?>[] {String.class}, new RemoteParam());
+        rpcClient.invokeSequential(locations,
+            method, HdfsFileStatus.class, null);
+        CompletableFuture<Object> completableFuture = getCompletableFuture();
+        completableFuture = completableFuture.thenApply(o -> {
+          HdfsFileStatus fileStatus = (HdfsFileStatus) o;
+          if (fileStatus != null) {
+            return fileStatus.isDirectory();
+          } else {
+            LOG.debug("The destination {} doesn't exist.", src);
+          }
+          return false;
+        });
+        setCurCompletableFuture(completableFuture);
+        return (boolean) RouterAsyncRpcUtil.getResult();
+      }
+    } catch (UnresolvedPathException e) {
+      LOG.debug("The destination {} is a symlink.", src);
+    }
+    setCurCompletableFuture(CompletableFuture.completedFuture(false));
+    return (boolean) RouterAsyncRpcUtil.getResult();
   }
 }

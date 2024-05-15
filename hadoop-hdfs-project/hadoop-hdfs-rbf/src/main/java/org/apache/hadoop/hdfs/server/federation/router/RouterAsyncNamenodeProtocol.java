@@ -42,7 +42,7 @@ public class RouterAsyncNamenodeProtocol extends RouterNamenodeProtocol{
 
     // Get the namespace where the datanode is located
     Map<String, DatanodeStorageReport[]> map =
-        rpcServer.getDatanodeStorageReportMap(HdfsConstants.DatanodeReportType.ALL);
+        rpcServer.getDatanodeStorageReportMapAsync(HdfsConstants.DatanodeReportType.ALL);
     CompletableFuture<Object> completableFuture = getCompletableFuture();
     completableFuture = completableFuture.thenApply((Function<Object, Object>) o -> {
       String nsId = null;

@@ -675,8 +675,14 @@ public class TestRouterRPCMultipleDestinationMountTableResolver {
     try {
       // Verify that #invokeAtAvailableNs works by calling #getServerDefaults.
       RemoteMethod method = new RemoteMethod("getServerDefaults");
-      FsServerDefaults serverDefaults =
-          rpcServer.invokeAtAvailableNs(method, FsServerDefaults.class);
+      FsServerDefaults serverDefaults = null;
+      if (rpcServer.isAsync()) {
+        rpcServer.invokeAtAvailableNsAsync(method, FsServerDefaults.class);
+        serverDefaults = (FsServerDefaults) RouterAsyncRpcUtil.getResult();
+      } else {
+        serverDefaults =
+            rpcServer.invokeAtAvailableNs(method, FsServerDefaults.class);
+      }
       assertNotNull(serverDefaults);
     } finally {
       dfsCluster.restartNameNode(0);

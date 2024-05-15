@@ -94,7 +94,8 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
       return results.containsValue(true);
     });
     CUR_COMPLETABLE_FUTURE.set(completableFuture);
-    return (boolean) getResult();
+//    return (boolean) getResult();
+    return false;
   }
 
   @Override
@@ -399,7 +400,8 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
       return result.getResult();
     });
     CUR_COMPLETABLE_FUTURE.set(completableFuture);
-    return (T) getResult();
+//    return (T) getResult();
+    return RouterAsyncRpcUtil.asyncReturn(expectedResultClass);
   }
 
   @Override
@@ -454,7 +456,8 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
     });
     System.out.println("zjcom2: " + resultFuture);
     CUR_COMPLETABLE_FUTURE.set(resultFuture);
-    return (RemoteResult) getResult();
+//    return (RemoteResult) getResult();
+    return null;
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -555,7 +558,8 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
       return ret;
     });
     CUR_COMPLETABLE_FUTURE.set(completableFuture);
-    return (Map<T, R>) getResult();
+//    return (Map<T, R>) getResult();
+    return null;
   }
 
   @Override
@@ -565,7 +569,8 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
                    final RemoteMethod method, boolean standby, long timeOutMs,
                    Class<R> clazz) throws IOException {
     invokeConcurrentAsync(locations, method, standby, timeOutMs, clazz);
-    return (List<RemoteResult<T, R>>) getResult();
+//    return (List<RemoteResult<T, R>>) getResult();
+    return null;
   }
 
   private  <T extends RemoteLocationContext, R> List<RemoteResult<T, R>>
@@ -701,13 +706,15 @@ public class RouterAsyncRpcClient extends RouterRpcClient{
                             RemoteMethod remoteMethod, Class<T> clazz) throws IOException {
     List<RemoteLocationContext> locations = Collections.singletonList(location);
     invokeSequential(locations, remoteMethod);
-    return (T) getResult();
+//    return (T) getResult();
+    return RouterAsyncRpcUtil.asyncReturn(clazz);
   }
 
   @Override
   public Object invokeSingle(final String nsId, RemoteMethod method)
       throws IOException {
     super.invokeSingle(nsId, method);
-    return getResult();
+//    return getResult();
+    return null;
   }
 }
