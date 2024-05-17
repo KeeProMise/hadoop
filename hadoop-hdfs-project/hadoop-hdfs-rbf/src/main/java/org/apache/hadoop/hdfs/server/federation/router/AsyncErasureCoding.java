@@ -15,8 +15,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
+
+import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.asyncRequestThenApply;
+import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.asyncReturn;
 import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.getCompletableFuture;
-import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.getResult;
 import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.setCurCompletableFuture;
 
 import static org.apache.hadoop.hdfs.server.federation.router.RouterRpcServer.merge;
@@ -51,10 +54,10 @@ public class AsyncErasureCoding extends ErasureCoding{
       return merge(ret, ErasureCodingPolicyInfo.class);
     });
     setCurCompletableFuture(completableFuture);
-    return (ErasureCodingPolicyInfo[]) getResult();
+    return asyncReturn(ErasureCodingPolicyInfo[].class);
   }
 
-  public Map<String, String> getErasureCodingCodecs() throws IOException {
+  public Map getErasureCodingCodecs() throws IOException {
     rpcServer.checkOperation(NameNode.OperationCategory.READ);
 
     RemoteMethod method = new RemoteMethod("getErasureCodingCodecs");
@@ -78,7 +81,7 @@ public class AsyncErasureCoding extends ErasureCoding{
       return ret;
     });
     setCurCompletableFuture(completableFuture);
-    return (Map<String, String>) getResult();
+    return asyncReturn(Map.class);
   }
 
   public AddErasureCodingPolicyResponse[] addErasureCodingPolicies(
@@ -97,7 +100,7 @@ public class AsyncErasureCoding extends ErasureCoding{
       return merge(ret, AddErasureCodingPolicyResponse.class);
     });
     setCurCompletableFuture(completableFuture);
-    return (AddErasureCodingPolicyResponse[]) getResult();
+    return asyncReturn(AddErasureCodingPolicyResponse[].class);
   }
 
   public ECTopologyVerifierResult getECTopologyResultForPolicies(
@@ -124,7 +127,7 @@ public class AsyncErasureCoding extends ErasureCoding{
       return ret.get(nss.iterator().next());
     });
     setCurCompletableFuture(completableFuture);
-    return (ECTopologyVerifierResult) getResult();
+    return asyncReturn(ECTopologyVerifierResult.class);
   }
 
   public ECBlockGroupStats getECBlockGroupStats() throws IOException {
@@ -142,6 +145,6 @@ public class AsyncErasureCoding extends ErasureCoding{
       return ECBlockGroupStats.merge(allStats1.values());
     });
     setCurCompletableFuture(completableFuture);
-    return (ECBlockGroupStats) getResult();
+    return asyncReturn(ECBlockGroupStats.class);
   }
 }

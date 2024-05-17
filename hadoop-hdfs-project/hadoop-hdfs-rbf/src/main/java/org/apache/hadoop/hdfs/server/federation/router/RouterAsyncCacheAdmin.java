@@ -16,8 +16,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+
+import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.asyncReturn;
 import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.getCompletableFuture;
-import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.getResult;
 import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.setCurCompletableFuture;
 
 public class RouterAsyncCacheAdmin extends RouterCacheAdmin{
@@ -50,7 +51,7 @@ public class RouterAsyncCacheAdmin extends RouterCacheAdmin{
       return response.values().iterator().next();
     });
     setCurCompletableFuture(completableFuture);
-    return (long) getResult();
+    return asyncReturn(Long.class);
   }
 
   public BatchedRemoteIterator.BatchedEntries<CacheDirectiveEntry> listCacheDirectives(
@@ -73,7 +74,7 @@ public class RouterAsyncCacheAdmin extends RouterCacheAdmin{
         return response.values().iterator().next();
       });
       setCurCompletableFuture(completableFuture);
-      return (BatchedRemoteIterator.BatchedEntries<CacheDirectiveEntry>) getResult();
+      return asyncReturn(BatchedRemoteIterator.BatchedEntries.class);
     }
     RemoteMethod method = new RemoteMethod("listCacheDirectives",
         new Class<?>[] {long.class, CacheDirectiveInfo.class}, prevId,
@@ -88,7 +89,7 @@ public class RouterAsyncCacheAdmin extends RouterCacheAdmin{
       return results.values().iterator().next();
     });
     setCurCompletableFuture(completableFuture);
-    return (BatchedRemoteIterator.BatchedEntries<CacheDirectiveEntry>) getResult();
+    return asyncReturn(BatchedRemoteIterator.BatchedEntries.class);
   }
 
   public BatchedRemoteIterator.BatchedEntries<CachePoolEntry> listCachePools(String prevKey)
@@ -106,6 +107,6 @@ public class RouterAsyncCacheAdmin extends RouterCacheAdmin{
       return results.values().iterator().next();
     });
     setCurCompletableFuture(completableFuture);
-    return (BatchedRemoteIterator.BatchedEntries<CachePoolEntry>) getResult();
+    return asyncReturn(BatchedRemoteIterator.BatchedEntries.class);
   }
 }

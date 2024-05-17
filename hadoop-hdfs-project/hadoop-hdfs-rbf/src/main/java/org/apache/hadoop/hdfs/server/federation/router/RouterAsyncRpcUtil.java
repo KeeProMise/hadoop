@@ -1,21 +1,18 @@
 package org.apache.hadoop.hdfs.server.federation.router;
 
+import org.apache.hadoop.hdfs.protocolPB.AsyncRpcProtocolPBUtil;
+
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Function;
 
 public final class RouterAsyncRpcUtil {
   public static final ThreadLocal<CompletableFuture<Object>> CUR_COMPLETABLE_FUTURE
       = new ThreadLocal<>();
   private static final Boolean BOOLEAN_RESULT = false;
-  private static final Long LONG_RESULT = -1l;
+  private static final Long LONG_RESULT = -1L;
   private static final Object NULL_RESULT = null;
-
-  public static  <T> CompletableFuture<T> asyncInvoke(
-      Invoker<T> invoker) throws IOException {
-    invoker.invoke();
-    return (CompletableFuture<T>) CUR_COMPLETABLE_FUTURE.get();
-  }
 
   public static CompletableFuture<Object> getCompletableFuture() {
     return CUR_COMPLETABLE_FUTURE.get();
@@ -52,7 +49,19 @@ public final class RouterAsyncRpcUtil {
     return (T) NULL_RESULT;
   }
 
-  public interface Invoker<T> {
-    T invoke() throws IOException;
+  public static <T, R> T asyncRequestThenApply(
+      AsyncRequest<R> asyncRequest, Function<R, T> thenDo, Class<T> clazz) throws IOException {
+    asyncRequest.res();
+    CompletableFuture<R> completableFuture =
+        (CompletableFuture<R>) CUR_COMPLETABLE_FUTURE.get();
+    CompletableFuture<T> resCompletableFuture = completableFuture.thenApply(thenDo);
+    setCurCompletableFuture((CompletableFuture<Object>) resCompletableFuture);
+    return asyncReturn(clazz);
   }
+
+  @FunctionalInterface
+  interface AsyncRequest<R> {
+    R res() throws IOException;
+  }
+
 }

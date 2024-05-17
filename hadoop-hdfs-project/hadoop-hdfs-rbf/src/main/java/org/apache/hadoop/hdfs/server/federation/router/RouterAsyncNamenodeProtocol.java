@@ -18,8 +18,8 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 
+import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.asyncReturn;
 import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.getCompletableFuture;
-import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.getResult;
 import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.setCurCompletableFuture;
 
 public class RouterAsyncNamenodeProtocol extends RouterNamenodeProtocol{
@@ -79,7 +79,7 @@ public class RouterAsyncNamenodeProtocol extends RouterNamenodeProtocol{
       return CompletableFuture.completedFuture(null);
     });
     setCurCompletableFuture(completableFuture);
-    return (BlocksWithLocations) getResult();
+    return asyncReturn(BlocksWithLocations.class);
   }
 
   @Override
@@ -89,7 +89,7 @@ public class RouterAsyncNamenodeProtocol extends RouterNamenodeProtocol{
     RemoteMethod method =
         new RemoteMethod(NamenodeProtocol.class, "getBlockKeys");
     rpcServer.invokeAtAvailableNsAsync(method, ExportedBlockKeys.class);
-    return (ExportedBlockKeys) getResult();
+    return asyncReturn(ExportedBlockKeys.class);
   }
 
   @Override
@@ -99,7 +99,7 @@ public class RouterAsyncNamenodeProtocol extends RouterNamenodeProtocol{
     RemoteMethod method =
         new RemoteMethod(NamenodeProtocol.class, "getTransactionID");
     rpcServer.invokeAtAvailableNsAsync(method, long.class);
-    return (long) getResult();
+    return asyncReturn(Long.class);
   }
 
   @Override
@@ -109,7 +109,7 @@ public class RouterAsyncNamenodeProtocol extends RouterNamenodeProtocol{
     RemoteMethod method =
         new RemoteMethod(NamenodeProtocol.class, "getMostRecentCheckpointTxId");
     rpcServer.invokeAtAvailableNsAsync(method, long.class);
-    return (long) getResult();
+    return asyncReturn(Long.class);
   }
 
   @Override
@@ -121,7 +121,7 @@ public class RouterAsyncNamenodeProtocol extends RouterNamenodeProtocol{
         new RemoteMethod(NamenodeProtocol.class, "getMostRecentNameNodeFileTxId",
             new Class<?>[] {NNStorage.NameNodeFile.class}, nnf);
     rpcServer.invokeAtAvailableNsAsync(method, long.class);
-    return (long) getResult();
+    return asyncReturn(Long.class);
   }
 
   @Override
@@ -131,6 +131,6 @@ public class RouterAsyncNamenodeProtocol extends RouterNamenodeProtocol{
     RemoteMethod method =
         new RemoteMethod(NamenodeProtocol.class, "versionRequest");
     rpcServer.invokeAtAvailableNsAsync(method, NamespaceInfo.class);
-    return (NamespaceInfo) getResult();
+    return asyncReturn(NamespaceInfo.class);
   }
 }

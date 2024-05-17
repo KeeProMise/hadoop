@@ -16,8 +16,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+
+import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.asyncReturn;
 import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.getCompletableFuture;
-import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.getResult;
 import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.setCurCompletableFuture;
 
 public class RouterAsyncSnapshot extends RouterSnapshot{
@@ -65,7 +66,7 @@ public class RouterAsyncSnapshot extends RouterSnapshot{
       });
     }
     setCurCompletableFuture(completableFuture);
-    return (String) getResult();
+    return asyncReturn(String.class);
   }
 
   public SnapshottableDirectoryStatus[] getSnapshottableDirListing()
@@ -86,7 +87,7 @@ public class RouterAsyncSnapshot extends RouterSnapshot{
       return RouterRpcServer.merge(ret1, SnapshottableDirectoryStatus.class);
     });
     setCurCompletableFuture(completableFuture);
-    return (SnapshottableDirectoryStatus[]) getResult();
+    return asyncReturn(SnapshottableDirectoryStatus[].class);
   }
 
   public SnapshotStatus[] getSnapshotListing(String snapshotRoot)
@@ -136,7 +137,7 @@ public class RouterAsyncSnapshot extends RouterSnapshot{
       });
     }
     setCurCompletableFuture(completableFuture);
-    return (SnapshotStatus[]) getResult();
+    return asyncReturn(SnapshotStatus[].class);
   }
 
 
@@ -169,7 +170,7 @@ public class RouterAsyncSnapshot extends RouterSnapshot{
       completableFuture = getCompletableFuture();
     }
     setCurCompletableFuture(completableFuture);
-    return (SnapshotDiffReport) getResult();
+    return asyncReturn(SnapshotDiffReport.class);
   }
 
   public SnapshotDiffReportListing getSnapshotDiffReportListing(
@@ -207,6 +208,6 @@ public class RouterAsyncSnapshot extends RouterSnapshot{
       completableFuture = getCompletableFuture();
     }
     setCurCompletableFuture(completableFuture);
-    return (SnapshotDiffReportListing) getResult();
+    return asyncReturn(SnapshotDiffReportListing.class);
   }
 }
