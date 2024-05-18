@@ -18,7 +18,6 @@ import java.util.concurrent.CompletableFuture;
 
 import static org.apache.hadoop.hdfs.server.federation.router.RouterRpcServer.merge;
 import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.getCompletableFuture;
-import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.getResult;
 import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.setCurCompletableFuture;
 
 public class RouterAsyncUserProtocol extends RouterUserProtocol{

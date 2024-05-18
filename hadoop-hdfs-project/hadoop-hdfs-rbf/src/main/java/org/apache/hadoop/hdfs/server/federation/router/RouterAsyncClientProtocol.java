@@ -29,24 +29,14 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.QuotaUsage;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.fs.XAttr;
-import org.apache.hadoop.fs.XAttrSetFlag;
-import org.apache.hadoop.fs.permission.AclEntry;
-import org.apache.hadoop.fs.permission.AclStatus;
-import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.ha.HAServiceProtocol;
-import org.apache.hadoop.hdfs.AddBlockFlag;
 import org.apache.hadoop.hdfs.DFSUtil;
-import org.apache.hadoop.hdfs.inotify.EventBatchList;
 import org.apache.hadoop.hdfs.protocol.AddErasureCodingPolicyResponse;
-import org.apache.hadoop.hdfs.protocol.BatchedDirectoryListing;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
 import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
 import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
-import org.apache.hadoop.hdfs.protocol.CorruptFileBlocks;
-import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
 import org.apache.hadoop.hdfs.protocol.ECBlockGroupStats;
@@ -54,15 +44,11 @@ import org.apache.hadoop.hdfs.protocol.ECTopologyVerifierResult;
 import org.apache.hadoop.hdfs.protocol.EncryptionZone;
 import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicy;
 import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicyInfo;
-import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
-import org.apache.hadoop.hdfs.protocol.HdfsLocatedFileStatus;
 import org.apache.hadoop.hdfs.protocol.LastBlockWithStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
-import org.apache.hadoop.hdfs.protocol.OpenFileEntry;
-import org.apache.hadoop.hdfs.protocol.OpenFilesIterator;
 import org.apache.hadoop.hdfs.protocol.ReplicatedBlockStats;
 import org.apache.hadoop.hdfs.protocol.RollingUpgradeInfo;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
@@ -70,8 +56,6 @@ import org.apache.hadoop.hdfs.protocol.SnapshotDiffReportListing;
 import org.apache.hadoop.hdfs.protocol.SnapshotStatus;
 import org.apache.hadoop.hdfs.protocol.SnapshottableDirectoryStatus;
 import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
-import org.apache.hadoop.hdfs.protocol.ZoneReencryptionStatus;
-import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.server.federation.resolver.ActiveNamenodeResolver;
 import org.apache.hadoop.hdfs.server.federation.resolver.FederationNamespaceInfo;
@@ -95,6 +79,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -105,8 +90,8 @@ import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 
 import static org.apache.hadoop.hdfs.server.federation.router.FederationUtil.updateMountPointStatus;
+import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.asyncReturn;
 import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.getCompletableFuture;
-import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.getResult;
 import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.setCurCompletableFuture;
 
 public class RouterAsyncClientProtocol extends RouterClientProtocol {
@@ -151,7 +136,7 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
           CompletableFuture.completedFuture(serverDefaults);
     }
     setCurCompletableFuture(completableFuture);
-    return (FsServerDefaults) getResult();
+    return asyncReturn(FsServerDefaults.class);
   }
 
   @Override
@@ -233,7 +218,7 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
       return CompletableFuture.completedFuture(o);
     });
     setCurCompletableFuture(completableFuture);
-    return (HdfsFileStatus) getResult();
+    return asyncReturn(HdfsFileStatus.class);
   }
 
   @Override
@@ -257,7 +242,111 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
       return lbws;
     });
     setCurCompletableFuture(completableFuture);
-    return (LastBlockWithStatus) getResult();
+    return asyncReturn(LastBlockWithStatus.class);
+  }
+
+  @Deprecated
+  @Override
+  public boolean rename(final String src, final String dst)
+      throws IOException {
+    RouterRpcServer rpcServer = getRpcServer();
+    RouterRpcClient rpcClient = getRpcClient();
+    RouterFederationRename rbfRename = getRbfRename();
+    rpcServer.checkOperation(NameNode.OperationCategory.WRITE);
+
+    final List<RemoteLocation> srcLocations =
+        rpcServer.getLocationsForPath(src, true, false);
+    final List<RemoteLocation> dstLocations =
+        rpcServer.getLocationsForPath(dst, false, false);
+    // srcLocations may be trimmed by getRenameDestinations()
+    final List<RemoteLocation> locs = new LinkedList<>(srcLocations);
+    RemoteParam dstParam = getRenameDestinations(locs, dstLocations);
+    if (locs.isEmpty()) {
+      return rbfRename.routerFedRename(src, dst, srcLocations, dstLocations);
+    }
+    RemoteMethod method = new RemoteMethod("rename",
+        new Class<?>[] {String.class, String.class},
+        new RemoteParam(), dstParam);
+    isMultiDestDirectory(src);
+    CompletableFuture<Object> completableFuture = getCompletableFuture();
+    completableFuture = completableFuture.thenCompose(o -> {
+      Boolean isMultiDest = (Boolean) o;
+      if (isMultiDest) {
+        if (locs.size() != srcLocations.size()) {
+          IOException ioe = new IOException("Rename of " + src + " to " + dst + " is not"
+              + " allowed. The number of remote locations for both source and"
+              + " target should be same.");
+          throw new CompletionException(ioe);
+        }
+        try {
+          rpcClient.invokeAll(locs, method);
+          return getCompletableFuture();
+        } catch (IOException e) {
+          throw new CompletionException(e);
+        }
+      } else {
+        try {
+          rpcClient.invokeSequential(locs, method, Boolean.class,
+              Boolean.TRUE);
+          return getCompletableFuture();
+        } catch (IOException e) {
+          throw new CompletionException(e);
+        }
+      }
+    });
+    setCurCompletableFuture(completableFuture);
+    return asyncReturn(Boolean.class);
+  }
+
+  @Override
+  public void rename2(final String src, final String dst,
+                      final Options.Rename... options) throws IOException {
+    RouterRpcServer rpcServer = getRpcServer();
+    RouterRpcClient rpcClient = getRpcClient();
+    RouterFederationRename rbfRename = getRbfRename();
+    rpcServer.checkOperation(NameNode.OperationCategory.WRITE);
+
+    final List<RemoteLocation> srcLocations =
+        rpcServer.getLocationsForPath(src, true, false);
+    final List<RemoteLocation> dstLocations =
+        rpcServer.getLocationsForPath(dst, false, false);
+    // srcLocations may be trimmed by getRenameDestinations()
+    final List<RemoteLocation> locs = new LinkedList<>(srcLocations);
+    RemoteParam dstParam = getRenameDestinations(locs, dstLocations);
+    if (locs.isEmpty()) {
+      rbfRename.routerFedRename(src, dst, srcLocations, dstLocations);
+      return;
+    }
+    RemoteMethod method = new RemoteMethod("rename2",
+        new Class<?>[] {String.class, String.class, options.getClass()},
+        new RemoteParam(), dstParam, options);
+    isMultiDestDirectory(src);
+    CompletableFuture<Object> completableFuture = getCompletableFuture();
+    completableFuture = completableFuture.thenCompose(o -> {
+      Boolean isMultiDest = (Boolean) o;
+      if (isMultiDest) {
+        if (locs.size() != srcLocations.size()) {
+          IOException ioe = new IOException("Rename of " + src + " to " + dst + " is not"
+              + " allowed. The number of remote locations for both source and"
+              + " target should be same.");
+          throw new CompletionException(ioe);
+        }
+        try {
+          rpcClient.invokeConcurrent(locs, method);
+          return getCompletableFuture();
+        } catch (IOException e) {
+          throw new CompletionException(e);
+        }
+      } else {
+        try {
+          rpcClient.invokeSequential(locs, method, null, null);
+          return getCompletableFuture();
+        } catch (IOException e) {
+          throw new CompletionException(e);
+        }
+      }
+    });
+    setCurCompletableFuture(completableFuture);
   }
 
   @Override
@@ -334,7 +423,7 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
     });
 
     setCurCompletableFuture(completableFuture);
-    getResult();
+    asyncReturn(Void.class);
   }
 
   @Override
@@ -413,7 +502,7 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
       }
     });
     setCurCompletableFuture(completableFuture);
-    return (boolean) getResult();
+    return asyncReturn(Boolean.class);
   }
 
   @Override
@@ -564,7 +653,7 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
       return new DirectoryListing(combinedData, remainingEntries);
     });
     setCurCompletableFuture(completableFuture);
-    return (DirectoryListing) getResult();
+    return asyncReturn(DirectoryListing.class);
   }
 
   HdfsFileStatus getMountPointStatus(
@@ -649,11 +738,7 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
           .build();
     });
     setCurCompletableFuture(completableFuture);
-    try {
-      return (HdfsFileStatus) getResult();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+    return asyncReturn(HdfsFileStatus.class);
   }
 
 
@@ -688,7 +773,7 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
       return null;
     });
     setCurCompletableFuture(completableFuture);
-    return (HdfsFileStatus) getResult();
+    return asyncReturn(HdfsFileStatus.class);
   }
 
   @Override
@@ -703,7 +788,7 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
         new Class<?>[] {String.class, String.class}, new RemoteParam(),
         clientName);
     rpcClient.invokeSequential(locations, method, Boolean.class, null);
-    return (boolean) getResult();
+    return asyncReturn(Boolean.class);
   }
 
   @Override
@@ -731,7 +816,7 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
       return combinedData;
     });
     setCurCompletableFuture(completableFuture);
-    return (long[]) getResult();
+    return asyncReturn(long[].class);
   }
 
   @Override
@@ -819,7 +904,7 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
       return ReplicatedBlockStats.merge(ret.values());
     });
     setCurCompletableFuture(completableFuture);
-    return (ReplicatedBlockStats) getResult();
+    return asyncReturn(ReplicatedBlockStats.class);
   }
 
   @Override
@@ -844,7 +929,7 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
       return mergeDtanodeStorageReport(dnSubcluster);
     });
     setCurCompletableFuture(completableFuture);
-    return (DatanodeStorageReport[]) getResult();
+    return asyncReturn(DatanodeStorageReport[].class);
   }
 
   public DatanodeStorageReport[] getDatanodeStorageReport(
@@ -861,7 +946,7 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
       return mergeDtanodeStorageReport(dnSubcluster);
     });
     setCurCompletableFuture(completableFuture);
-    return (DatanodeStorageReport[]) getResult();
+    return asyncReturn(DatanodeStorageReport[].class);
   }
 
   @Override
@@ -893,7 +978,7 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
       return numSafemode == results.size();
     });
     setCurCompletableFuture(completableFuture);
-    return (boolean) getResult();
+    return asyncReturn(Boolean.class);
   }
 
   @Override
@@ -922,7 +1007,7 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
       return success;
     });
     setCurCompletableFuture(completableFuture);
-    return (boolean) getResult();
+    return asyncReturn(Boolean.class);
   }
 
   @Override
@@ -949,7 +1034,7 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
       return txid;
     });
     setCurCompletableFuture(completableFuture);
-    return (long) getResult();
+    return asyncReturn(Long.class);
   }
 
   @Override
@@ -977,7 +1062,7 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
       return success;
     });
     setCurCompletableFuture(completableFuture);
-    return (boolean) getResult();
+    return asyncReturn(Boolean.class);
   }
 
   @Override
@@ -1008,7 +1093,7 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
       return info;
     });
     setCurCompletableFuture(completableFuture);
-    return (RollingUpgradeInfo) getResult();
+    return asyncReturn(RollingUpgradeInfo.class);
   }
 
   @Override
@@ -1071,7 +1156,7 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
       return ret;
     });
     setCurCompletableFuture(completableFuture);
-    return null;
+    return asyncReturn(HdfsFileStatus.class);
   }
 
   private HdfsFileStatus getFileInfoAll(
@@ -1119,10 +1204,9 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
       return aggregateContentSummary(summaries);
     });
     setCurCompletableFuture(completableFuture);
-    return (ContentSummary) getResult();
+    return asyncReturn(ContentSummary.class);
   }
 
-  // todo
   @Override
   public void setQuota(
       String path, long namespaceQuota, long storagespaceQuota,
@@ -1226,7 +1310,7 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
     RemoteMethod method = new RemoteMethod("getXAttrs",
         new Class<?>[] {String.class, List.class}, new RemoteParam(), xAttrs);
     rpcClient.invokeSequential(locations, method, List.class, null);
-    return (List<XAttr>) getResult();
+    return asyncReturn(List.class);
   }
 
   @Override
@@ -1241,7 +1325,7 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
     RemoteMethod method = new RemoteMethod("listXAttrs",
         new Class<?>[] {String.class}, new RemoteParam());
     rpcClient.invokeSequential(locations, method, List.class, null);
-    return (List<XAttr>) getResult();
+    return asyncReturn(List.class);
   }
 
   @Override
@@ -1269,7 +1353,7 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
       return txid;
     });
     setCurCompletableFuture(completableFuture);
-    return (long) getResult();
+    return asyncReturn(Long.class);
   }
 
   @Override
@@ -1304,7 +1388,7 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
       }
     });
     setCurCompletableFuture(completableFuture);
-    return (Path) getResult();
+    return asyncReturn(Path.class);
   }
 
 
@@ -1435,12 +1519,12 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
           return false;
         });
         setCurCompletableFuture(completableFuture);
-        return (boolean) RouterAsyncRpcUtil.getResult();
+        return asyncReturn(Boolean.class);
       }
     } catch (UnresolvedPathException e) {
       LOG.debug("The destination {} is a symlink.", src);
     }
     setCurCompletableFuture(CompletableFuture.completedFuture(false));
-    return (boolean) RouterAsyncRpcUtil.getResult();
+    return asyncReturn(Boolean.class);
   }
 }

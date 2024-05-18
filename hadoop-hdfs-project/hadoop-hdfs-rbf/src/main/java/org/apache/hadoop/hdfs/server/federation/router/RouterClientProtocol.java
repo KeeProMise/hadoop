@@ -2038,7 +2038,7 @@ public class RouterClientProtocol implements ClientProtocol {
    *         replacement value.
    * @throws IOException If the dst paths could not be determined.
    */
-  private RemoteParam getRenameDestinations(
+  RemoteParam getRenameDestinations(
       final List<RemoteLocation> srcLocations,
       final List<RemoteLocation> dstLocations) throws IOException {
 
@@ -2454,6 +2454,10 @@ public class RouterClientProtocol implements ClientProtocol {
 
   public RouterRpcClient getRpcClient() {
     return rpcClient;
+  }
+
+  public RouterFederationRename getRbfRename() {
+    return rbfRename;
   }
 
   public ActiveNamenodeResolver getNamenodeResolver() {

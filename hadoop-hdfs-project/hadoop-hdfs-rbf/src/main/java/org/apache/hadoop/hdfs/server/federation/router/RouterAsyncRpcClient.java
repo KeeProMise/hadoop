@@ -61,7 +61,6 @@ import java.util.function.BiFunction;
 import static org.apache.hadoop.hdfs.server.federation.fairness.RouterRpcFairnessConstants.CONCURRENT_NS;
 import static org.apache.hadoop.hdfs.server.federation.metrics.FederationRPCPerformanceMonitor.CONCURRENT;
 import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.CUR_COMPLETABLE_FUTURE;
-import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.getResult;
 
 public class RouterAsyncRpcClient extends RouterRpcClient{
   private static final Logger LOG =
