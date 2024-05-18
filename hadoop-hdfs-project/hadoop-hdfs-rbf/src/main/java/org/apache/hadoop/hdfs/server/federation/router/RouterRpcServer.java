@@ -30,6 +30,8 @@ import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DN_R
 import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DN_REPORT_CACHE_EXPIRE_MS_DEFAULT;
 import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_FEDERATION_RENAME_OPTION;
 import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_FEDERATION_RENAME_OPTION_DEFAULT;
+import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.asyncReturn;
+import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.getResult;
 import static org.apache.hadoop.hdfs.server.federation.router.RouterFederationRename.RouterRenameOption;
 import static org.apache.hadoop.tools.fedbalance.FedBalanceConfigs.SCHEDULER_JOURNAL_URI;
 
@@ -198,7 +200,6 @@ import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.thirdparty.protobuf.BlockingService;
 
 import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.getCompletableFuture;
-import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.getResult;
 import static org.apache.hadoop.hdfs.server.federation.router.RouterAsyncRpcUtil.setCurCompletableFuture;
 
 /**
@@ -879,7 +880,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
       completableFuture = getCompletableFuture();
     }
     setCurCompletableFuture(completableFuture);
-    return (T) getResult();
+    return asyncReturn(clazz);
   }
 
   <T> T invokeOnNsAsync(RemoteMethod method, Class<T> clazz, IOException ioe,
@@ -933,7 +934,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
       return args[0];
     });
     setCurCompletableFuture(completableFuture);
-    return null;
+    return asyncReturn(clazz);
   }
 
   @Override // ClientProtocol
@@ -989,7 +990,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
     final List<RemoteLocation> locations = getLocationsForPath(src, true);
     if (router.isEnableAsync()) {
       getCreateLocationAsync(src, locations);
-      return (RemoteLocation) getResult();
+      return asyncReturn(RemoteLocation.class);
     }
     return getCreateLocation(src, locations);
   }
@@ -1064,7 +1065,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
       });
     }
     setCurCompletableFuture(completableFuture);
-    return (RemoteLocation) getResult();
+    return asyncReturn(RemoteLocation.class);
   }
 
 
@@ -1107,7 +1108,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
       return null;
     });
     setCurCompletableFuture(completableFuture);
-    return (RemoteLocation) getResult();
+    return asyncReturn(RemoteLocation.class);
   }
 
   @Override // ClientProtocol
@@ -1329,6 +1330,9 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
 
     try {
       DatanodeInfo[] dns = clientProto.getDatanodeReport(type);
+      if (isAsync()) {
+        dns = (DatanodeInfo[]) getResult();
+      }
       LOG.debug("Refresh cached DN report with {} datanodes", dns.length);
       return dns;
     } finally {
@@ -1389,7 +1393,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
       }
     });
     setCurCompletableFuture(completableFuture);
-    return (DatanodeInfo[]) getResult();
+    return asyncReturn(DatanodeInfo[].class);
   }
 
   @Override // ClientProtocol
@@ -1471,7 +1475,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
       return ret;
     });
     setCurCompletableFuture(completableFuture);
-    return (Map<String, DatanodeStorageReport[]>) getResult();
+    return asyncReturn(Map.class);
   }
 
   @Override // ClientProtocol
