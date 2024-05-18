@@ -656,6 +656,35 @@ public class RouterAsyncClientProtocol extends RouterClientProtocol {
     return asyncReturn(DirectoryListing.class);
   }
 
+  /**
+   * Get listing on remote locations.
+   */
+  @Override
+  List<RemoteResult<RemoteLocation, DirectoryListing>> getListingInt(
+      String src, byte[] startAfter, boolean needLocation) throws IOException {
+    RouterRpcServer rpcServer = getRpcServer();
+    RouterRpcClient rpcClient = getRpcClient();
+    try {
+      List<RemoteLocation> locations =
+          rpcServer.getLocationsForPath(src, false, false);
+      // Locate the dir and fetch the listing.
+      if (locations.isEmpty()) {
+        setCurCompletableFuture(CompletableFuture.completedFuture(new ArrayList<>()));
+        return asyncReturn(List.class);
+      }
+      RemoteMethod method = new RemoteMethod("getListing",
+          new Class<?>[] {String.class, startAfter.getClass(), boolean.class},
+          new RemoteParam(), startAfter, needLocation);
+      rpcClient.invokeConcurrent(locations, method, false, -1,
+              DirectoryListing.class);
+    } catch (NoLocationException | RouterResolveException e) {
+      LOG.debug("Cannot get locations for {}, {}.", src, e.getMessage());
+      setCurCompletableFuture(CompletableFuture.completedFuture(new ArrayList<>()));
+    }
+    return asyncReturn(List.class);
+  }
+
+
   HdfsFileStatus getMountPointStatus(
       String name, int childrenNum, long date, boolean setPath) {
     FileSubclusterResolver subclusterResolver = getSubclusterResolver();
