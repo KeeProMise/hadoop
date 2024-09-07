@@ -112,8 +112,6 @@ public class YarnConfiguration extends Configuration {
             SYSTEM_METRICS_PUBLISHER_ENABLED),
         new DeprecationDelta(RM_ZK_ACL, CommonConfigurationKeys.ZK_ACL),
         new DeprecationDelta(RM_ZK_AUTH, CommonConfigurationKeys.ZK_AUTH),
-        new DeprecationDelta(RM_ZK_ADDRESS,
-            CommonConfigurationKeys.ZK_ADDRESS),
         new DeprecationDelta(RM_ZK_NUM_RETRIES,
             CommonConfigurationKeys.ZK_NUM_RETRIES),
         new DeprecationDelta(RM_ZK_TIMEOUT_MS,
@@ -2160,15 +2158,18 @@ public class YarnConfiguration extends Configuration {
       NM_DISK_HEALTH_CHECK_PREFIX + "min-free-space-per-disk-mb";
 
   /**
+   * By default, all the disk can be used before it is marked as offline.
+   */
+  public static final long DEFAULT_NM_MIN_PER_DISK_FREE_SPACE_MB = 0;
+
+  /**
    * Enable/Disable the minimum disk free
    * space threshold for disk health checker.
    */
   public static final String NM_DISK_FREE_SPACE_THRESHOLD_ENABLED =
-      NM_DISK_HEALTH_CHECK_PREFIX +
-          "disk-free-space-threshold.enabled";
+      NM_DISK_HEALTH_CHECK_PREFIX + "disk-free-space-threshold.enabled";
 
-  public static final boolean
-      DEFAULT_NM_DISK_FREE_SPACE_THRESHOLD_ENABLED = true;
+  public static final boolean DEFAULT_NM_DISK_FREE_SPACE_THRESHOLD_ENABLED = true;
 
   /**
    * The minimum space that must be available on an offline
@@ -2182,9 +2183,13 @@ public class YarnConfiguration extends Configuration {
       NM_DISK_HEALTH_CHECK_PREFIX +
           "min-free-space-per-disk-watermark-high-mb";
   /**
-   * By default, all of the disk can be used before it is marked as offline.
+   * Validate content of the node manager directories can be accessed.
    */
-  public static final long DEFAULT_NM_MIN_PER_DISK_FREE_SPACE_MB = 0;
+  public static final String NM_WORKING_DIR_CONTENT_ACCESSIBILITY_VALIDATION_ENABLED =
+      NM_DISK_HEALTH_CHECK_PREFIX + "working-dir-content-accessibility-validation.enabled";
+
+  public static final boolean DEFAULT_NM_WORKING_DIR_CONTENT_ACCESSIBILITY_VALIDATION_ENABLED =
+      false;
 
   /** The health checker scripts. */
   public static final String NM_HEALTH_CHECK_SCRIPTS =
@@ -4037,6 +4042,9 @@ public class YarnConfiguration extends Configuration {
 
   public static final String DEFAULT_FEDERATION_STATESTORE_CLIENT_CLASS =
       "org.apache.hadoop.yarn.server.federation.store.impl.MemoryFederationStateStore";
+
+  public static final String FEDERATION_STATESTORE_ZK_ADDRESS =
+      FEDERATION_PREFIX + "state-store.zk.address";
 
   public static final String FEDERATION_CACHE_TIME_TO_LIVE_SECS =
       FEDERATION_PREFIX + "cache-ttl.secs";
