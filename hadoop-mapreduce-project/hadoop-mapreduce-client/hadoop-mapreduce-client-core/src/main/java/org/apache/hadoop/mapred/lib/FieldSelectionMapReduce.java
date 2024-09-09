@@ -96,7 +96,7 @@ public class FieldSelectionMapReduce<K, V>
       LoggerFactory.getLogger("FieldSelectionMapReduce");
 
   private String specToString() {
-    StringBuilder sb = new StringBuilder();
+    StringBuffer sb = new StringBuffer();
     sb.append("fieldSeparator: ").append(fieldSeparator).append("\n");
 
     sb.append("mapOutputKeyValueSpec: ").append(mapOutputKeyValueSpec).append(

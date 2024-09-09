@@ -175,7 +175,7 @@ public class CombineFileSplit extends InputSplit implements Writable {
   
   @Override
  public String toString() {
-    StringBuilder sb = new StringBuilder();
+    StringBuffer sb = new StringBuffer();
     for (int i = 0; i < paths.length; i++) {
       if (i == 0 ) {
         sb.append("Paths:");
@@ -188,7 +188,7 @@ public class CombineFileSplit extends InputSplit implements Writable {
     }
     if (locations != null) {
       String locs = "";
-      StringBuilder locsb = new StringBuilder();
+      StringBuffer locsb = new StringBuffer();
       for (int i = 0; i < locations.length; i++) {
         locsb.append(locations[i] + ":");
       }

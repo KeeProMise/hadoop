@@ -1977,9 +1977,9 @@ public class FileContext implements PathCapabilities {
         LocatedFileStatus curFile;
 
         /**
-         * Returns <code>true</code> if the iterator has more files.
+         * Returns <tt>true</tt> if the iterator has more files.
          *
-         * @return <code>true</code> if the iterator has more files.
+         * @return <tt>true</tt> if the iterator has more files.
          * @throws AccessControlException if not allowed to access next
          *                                file's status or locations
          * @throws FileNotFoundException if next file does not exist any more
@@ -2071,34 +2071,34 @@ public class FileContext implements PathCapabilities {
      * <dl>
      *  <dd>
      *   <dl>
-     *    <dt> <code> ? </code>
+     *    <dt> <tt> ? </tt>
      *    <dd> Matches any single character.
      *
-     *    <dt> <code> * </code>
+     *    <dt> <tt> * </tt>
      *    <dd> Matches zero or more characters.
      *
-     *    <dt> <code> [<i>abc</i>] </code>
+     *    <dt> <tt> [<i>abc</i>] </tt>
      *    <dd> Matches a single character from character set
-     *     <code>{<i>a,b,c</i>}</code>.
+     *     <tt>{<i>a,b,c</i>}</tt>.
      *
-     *    <dt> <code> [<i>a</i>-<i>b</i>] </code>
+     *    <dt> <tt> [<i>a</i>-<i>b</i>] </tt>
      *    <dd> Matches a single character from the character range
-     *     <code>{<i>a...b</i>}</code>. Note: character <code><i>a</i></code> must be
-     *     lexicographically less than or equal to character <code><i>b</i></code>.
+     *     <tt>{<i>a...b</i>}</tt>. Note: character <tt><i>a</i></tt> must be
+     *     lexicographically less than or equal to character <tt><i>b</i></tt>.
      *
-     *    <dt> <code> [^<i>a</i>] </code>
+     *    <dt> <tt> [^<i>a</i>] </tt>
      *    <dd> Matches a single char that is not from character set or range
-     *     <code>{<i>a</i>}</code>.  Note that the <code>^</code> character must occur
+     *     <tt>{<i>a</i>}</tt>.  Note that the <tt>^</tt> character must occur
      *     immediately to the right of the opening bracket.
      *
-     *    <dt> <code> \<i>c</i> </code>
+     *    <dt> <tt> \<i>c</i> </tt>
      *    <dd> Removes (escapes) any special meaning of character <i>c</i>.
      *
-     *    <dt> <code> {ab,cd} </code>
-     *    <dd> Matches a string from the string set <code>{<i>ab, cd</i>} </code>
+     *    <dt> <tt> {ab,cd} </tt>
+     *    <dd> Matches a string from the string set <tt>{<i>ab, cd</i>} </tt>
      *
-     *    <dt> <code> {ab,c{de,fh}} </code>
-     *    <dd> Matches a string from string set <code>{<i>ab, cde, cfh</i>}</code>
+     *    <dt> <tt> {ab,c{de,fh}} </tt>
+     *    <dd> Matches a string from string set <tt>{<i>ab, cde, cfh</i>}</tt>
      *
      *   </dl>
      *  </dd>

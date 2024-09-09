@@ -171,7 +171,7 @@ public class ShuffleSchedulerImpl<K,V> implements ShuffleScheduler<K,V> {
   }
 
   static URI getBaseURI(TaskAttemptID reduceId, String url) {
-    StringBuilder baseUrl = new StringBuilder(url);
+    StringBuffer baseUrl = new StringBuffer(url);
     if (!url.endsWith("/")) {
       baseUrl.append("/");
     }

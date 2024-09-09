@@ -516,7 +516,7 @@ public class TestAMWebServicesAttempts extends JerseyTestBase {
     String expectDiag = "";
     List<String> diagnosticsList = ta.getDiagnostics();
     if (diagnosticsList != null && !diagnostics.isEmpty()) {
-      StringBuilder b = new StringBuilder();
+      StringBuffer b = new StringBuffer();
       for (String diag : diagnosticsList) {
         b.append(diag);
       }

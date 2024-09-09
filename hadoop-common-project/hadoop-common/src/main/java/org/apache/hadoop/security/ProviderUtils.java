@@ -148,7 +148,7 @@ public final class ProviderUtils {
     if (providerPath == null) {
       return config;
     }
-    StringBuilder newProviderPath = new StringBuilder();
+    StringBuffer newProviderPath = new StringBuffer();
     String[] providers = providerPath.split(",");
     Path path = null;
     for (String provider: providers) {

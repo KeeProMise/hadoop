@@ -108,8 +108,7 @@ public class AbstractS3ACostTest extends AbstractS3ATestBase {
     removeBaseAndBucketOverrides(bucketName, conf,
         DIRECTORY_MARKER_POLICY,
         AUTHORITATIVE_PATH,
-        FS_S3A_CREATE_PERFORMANCE,
-        FS_S3A_PERFORMANCE_FLAGS);
+        FS_S3A_CREATE_PERFORMANCE);
     // directory marker options
     conf.set(DIRECTORY_MARKER_POLICY,
         keepMarkers

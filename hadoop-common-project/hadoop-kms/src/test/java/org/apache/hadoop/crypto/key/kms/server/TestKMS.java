@@ -167,7 +167,7 @@ public class TestKMS {
       if (kmsUrl == null || kmsUrl.size() == 0) {
         return null;
       }
-      StringBuilder sb = new StringBuilder();
+      StringBuffer sb = new StringBuffer();
 
       for (int i = 0; i < kmsUrl.size(); i++) {
         sb.append(KMSClientProvider.SCHEME_NAME + "://" +

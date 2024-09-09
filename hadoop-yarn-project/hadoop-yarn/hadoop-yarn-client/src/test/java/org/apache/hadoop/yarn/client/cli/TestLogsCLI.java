@@ -1491,7 +1491,7 @@ public class TestLogsCLI {
   private String readContainerContent(Path containerPath,
       FileSystem fs) throws IOException {
     assertTrue(fs.exists(containerPath));
-    StringBuilder inputLine = new StringBuilder();
+    StringBuffer inputLine = new StringBuffer();
     try (BufferedReader reader = new BufferedReader(new InputStreamReader(
         fs.open(containerPath)))) {
       String tmp;

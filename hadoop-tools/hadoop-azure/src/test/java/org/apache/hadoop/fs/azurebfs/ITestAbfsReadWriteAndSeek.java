@@ -31,7 +31,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.azurebfs.constants.FSOperationType;
 import org.apache.hadoop.fs.azurebfs.services.AbfsInputStream;
 import org.apache.hadoop.fs.azurebfs.services.AbfsOutputStream;
-import org.apache.hadoop.fs.azurebfs.constants.HttpOperationType;
 import org.apache.hadoop.fs.azurebfs.utils.TracingHeaderValidator;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 
@@ -56,71 +55,22 @@ public class ITestAbfsReadWriteAndSeek extends AbstractAbfsScaleTest {
    * For test performance, a full x*y test matrix is not used.
    * @return the test parameters
    */
-  @Parameterized.Parameters(name = "Size={0}-readahead={1}-Client={2}")
+  @Parameterized.Parameters(name = "Size={0}-readahead={1}")
   public static Iterable<Object[]> sizes() {
-    return Arrays.asList(new Object[][]{
-        {
-            MIN_BUFFER_SIZE,
-            true,
-            HttpOperationType.JDK_HTTP_URL_CONNECTION
-        },
-        {
-            MIN_BUFFER_SIZE,
-            true,
-            HttpOperationType.APACHE_HTTP_CLIENT
-        },
-        {
-            DEFAULT_READ_BUFFER_SIZE,
-            false,
-            HttpOperationType.JDK_HTTP_URL_CONNECTION
-        },
-        {
-            DEFAULT_READ_BUFFER_SIZE,
-            false,
-            HttpOperationType.APACHE_HTTP_CLIENT
-        },
-        {
-            DEFAULT_READ_BUFFER_SIZE,
-            true,
-            HttpOperationType.JDK_HTTP_URL_CONNECTION
-        },
-        {
-            DEFAULT_READ_BUFFER_SIZE,
-            true,
-            HttpOperationType.APACHE_HTTP_CLIENT
-        },
-        {
-            APPENDBLOB_MAX_WRITE_BUFFER_SIZE,
-            false,
-            HttpOperationType.JDK_HTTP_URL_CONNECTION
-        },
-        {
-            APPENDBLOB_MAX_WRITE_BUFFER_SIZE,
-            false,
-            HttpOperationType.APACHE_HTTP_CLIENT
-        },
-        {
-            MAX_BUFFER_SIZE,
-            true,
-            HttpOperationType.JDK_HTTP_URL_CONNECTION
-        },
-        {
-            MAX_BUFFER_SIZE,
-            true,
-            HttpOperationType.APACHE_HTTP_CLIENT
-        }
-    });
+    return Arrays.asList(new Object[][]{{MIN_BUFFER_SIZE, true},
+        {DEFAULT_READ_BUFFER_SIZE, false},
+        {DEFAULT_READ_BUFFER_SIZE, true},
+        {APPENDBLOB_MAX_WRITE_BUFFER_SIZE, false},
+        {MAX_BUFFER_SIZE, true}});
   }
 
   private final int size;
   private final boolean readaheadEnabled;
-  private final HttpOperationType httpOperationType;
 
   public ITestAbfsReadWriteAndSeek(final int size,
-      final boolean readaheadEnabled, final HttpOperationType httpOperationType) throws Exception {
+      final boolean readaheadEnabled) throws Exception {
     this.size = size;
     this.readaheadEnabled = readaheadEnabled;
-    this.httpOperationType = httpOperationType;
   }
 
   @Test

@@ -45,7 +45,7 @@ public class AllocationTagsInfo {
 
   @Override
   public String toString() {
-    StringBuilder sb = new StringBuilder();
+    StringBuffer sb = new StringBuffer();
     Iterator<AllocationTagInfo> it = allocationTagInfo.iterator();
     while (it.hasNext()) {
       AllocationTagInfo current = it.next();

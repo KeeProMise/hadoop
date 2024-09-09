@@ -18,10 +18,6 @@
 
 package org.apache.hadoop.fs.azurebfs.services;
 
-/**
- * Implementation of {@link AbfsThrottlingIntercept} that does not throttle
- * the ABFS process.
- */
 final class AbfsNoOpThrottlingIntercept implements AbfsThrottlingIntercept {
 
   public static final AbfsNoOpThrottlingIntercept INSTANCE = new AbfsNoOpThrottlingIntercept();
@@ -29,13 +25,11 @@ final class AbfsNoOpThrottlingIntercept implements AbfsThrottlingIntercept {
   private AbfsNoOpThrottlingIntercept() {
   }
 
-  /**{@inheritDoc}*/
   @Override
   public void updateMetrics(final AbfsRestOperationType operationType,
-      final AbfsHttpOperation httpOperation) {
+      final AbfsHttpOperation abfsHttpOperation) {
   }
 
-  /**{@inheritDoc}*/
   @Override
   public void sendingRequest(final AbfsRestOperationType operationType,
       final AbfsCounters abfsCounters) {

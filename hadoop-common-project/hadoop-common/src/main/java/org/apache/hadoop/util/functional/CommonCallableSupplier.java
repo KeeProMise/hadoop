@@ -41,7 +41,7 @@ import static org.apache.hadoop.util.functional.FutureIO.raiseInnerCause;
  * raised by the callable and wrapping them as appropriate.
  * @param <T> return type.
  */
-public final class CommonCallableSupplier<T> implements Supplier<T> {
+public final class CommonCallableSupplier<T> implements Supplier {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(CommonCallableSupplier.class);
@@ -57,7 +57,7 @@ public final class CommonCallableSupplier<T> implements Supplier<T> {
   }
 
   @Override
-  public T get() {
+  public Object get() {
     try {
       return call.call();
     } catch (RuntimeException e) {
@@ -155,5 +155,4 @@ public final class CommonCallableSupplier<T> implements Supplier<T> {
       waitForCompletion(future);
     }
   }
-
 }

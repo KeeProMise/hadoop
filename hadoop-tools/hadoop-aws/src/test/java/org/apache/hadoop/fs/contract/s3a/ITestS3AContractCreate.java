@@ -29,7 +29,8 @@ import org.apache.hadoop.fs.contract.AbstractContractCreateTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 import org.apache.hadoop.fs.s3a.S3ATestUtils;
 
-import static org.apache.hadoop.fs.s3a.S3ATestUtils.setPerformanceFlags;
+import static org.apache.hadoop.fs.s3a.Constants.FS_S3A_CREATE_PERFORMANCE;
+import static org.apache.hadoop.fs.s3a.S3ATestUtils.removeBaseAndBucketOverrides;
 
 /**
  * S3A contract tests creating files.
@@ -68,9 +69,10 @@ public class ITestS3AContractCreate extends AbstractContractCreateTest {
 
   @Override
   protected Configuration createConfiguration() {
-    final Configuration conf = setPerformanceFlags(
-        super.createConfiguration(),
-        createPerformance ? "create" : "");
+    final Configuration conf = super.createConfiguration();
+    removeBaseAndBucketOverrides(conf,
+        FS_S3A_CREATE_PERFORMANCE);
+    conf.setBoolean(FS_S3A_CREATE_PERFORMANCE, createPerformance);
     S3ATestUtils.disableFilesystemCaching(conf);
     return conf;
   }

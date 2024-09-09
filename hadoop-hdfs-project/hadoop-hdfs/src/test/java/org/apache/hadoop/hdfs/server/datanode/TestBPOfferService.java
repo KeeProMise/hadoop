@@ -144,9 +144,8 @@ public class TestBPOfferService {
     mockNN2 = setupNNMock(1);
 
     // Set up a mock DN with the bare-bones configuration
-    // objects, etc. Set as stubOnly to save memory and avoid Mockito holding
-    // references to each invocation. This can cause OOM in some runs.
-    mockDn = Mockito.mock(DataNode.class, Mockito.withSettings().stubOnly());
+    // objects, etc.
+    mockDn = Mockito.mock(DataNode.class);
     Mockito.doReturn(true).when(mockDn).shouldRun();
     Configuration conf = new Configuration();
     File dnDataDir = new File(new File(TEST_BUILD_DATA, "dfs"), "data");

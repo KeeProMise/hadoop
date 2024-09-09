@@ -83,9 +83,9 @@ public class NetUtils {
   /**
    * Get the socket factory for the given class according to its
    * configuration parameter
-   * <code>hadoop.rpc.socket.factory.class.&lt;ClassName&gt;</code>. When no
+   * <tt>hadoop.rpc.socket.factory.class.&lt;ClassName&gt;</tt>. When no
    * such parameter exists then fall back on the default socket factory as
-   * configured by <code>hadoop.rpc.socket.factory.class.default</code>. If
+   * configured by <tt>hadoop.rpc.socket.factory.class.default</tt>. If
    * this default socket factory is not configured, then fall back on the JVM
    * default socket factory.
    * 
@@ -111,7 +111,7 @@ public class NetUtils {
 
   /**
    * Get the default socket factory as specified by the configuration
-   * parameter <code>hadoop.rpc.socket.factory.default</code>
+   * parameter <tt>hadoop.rpc.socket.factory.default</tt>
    * 
    * @param conf the configuration
    * @return the default socket factory as specified in the configuration or

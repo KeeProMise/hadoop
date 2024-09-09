@@ -20,7 +20,6 @@ package org.apache.hadoop.hdfs.qjournal.protocol;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.hdfs.protocol.proto.HdfsServerProtos.StorageInfoProto;
 import org.apache.hadoop.hdfs.qjournal.server.JournalNode;
 import org.apache.hadoop.hdfs.qjournal.protocol.QJournalProtocolProtos.GetEditLogManifestResponseProto;
 import org.apache.hadoop.security.KerberosInfo;
@@ -50,15 +49,6 @@ public interface InterQJournalProtocol {
    */
   GetEditLogManifestResponseProto getEditLogManifestFromJournal(
       String jid, String nameServiceId, long sinceTxId, boolean inProgressOk)
-      throws IOException;
-
-  /**
-   * Get the storage info for the specified journal.
-   * @param jid the journal identifier
-   * @param nameServiceId the name service id
-   * @return the storage info object
-   */
-  StorageInfoProto getStorageInfo(String jid, String nameServiceId)
       throws IOException;
 
 }

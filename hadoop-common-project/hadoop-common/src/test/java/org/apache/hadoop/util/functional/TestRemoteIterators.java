@@ -86,7 +86,7 @@ public class TestRemoteIterators extends AbstractHadoopTestBase {
    */
   @Test
   public void testSingleton() throws Throwable {
-    StringBuilder result = new StringBuilder();
+    StringBuffer result = new StringBuffer();
     String name = "singleton";
     RemoteIterator<String> it = remoteIteratorFromSingleton(name);
     assertStringValueContains(it, "SingletonIterator");

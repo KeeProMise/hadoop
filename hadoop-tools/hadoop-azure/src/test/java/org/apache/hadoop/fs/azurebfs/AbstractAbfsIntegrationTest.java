@@ -41,6 +41,7 @@ import org.apache.hadoop.fs.azurebfs.contracts.exceptions.AzureBlobFileSystemExc
 import org.apache.hadoop.fs.azurebfs.oauth2.AccessTokenProvider;
 import org.apache.hadoop.fs.azurebfs.security.AbfsDelegationTokenManager;
 import org.apache.hadoop.fs.azurebfs.services.AbfsClient;
+import org.apache.hadoop.fs.azurebfs.services.AbfsClientUtils;
 import org.apache.hadoop.fs.azurebfs.services.AbfsOutputStream;
 import org.apache.hadoop.fs.azurebfs.services.AuthType;
 import org.apache.hadoop.fs.azurebfs.services.ITestAbfsClient;
@@ -208,6 +209,8 @@ public abstract class AbstractAbfsIntegrationTest extends
       wasb = new NativeAzureFileSystem(azureNativeFileSystemStore);
       wasb.initialize(wasbUri, rawConfig);
     }
+    // Todo: To be fixed in HADOOP-19137
+    AbfsClientUtils.setIsNamespaceEnabled(abfs.getAbfsClient(), true);
   }
 
   @After
@@ -566,7 +569,16 @@ public abstract class AbstractAbfsIntegrationTest extends
         currentAuthType == AuthType.SAS);
     if (currentAuthType == AuthType.SharedKey) {
       assumeValidTestConfigPresent(getRawConfiguration(), FS_AZURE_ACCOUNT_KEY);
-    } else {
+    } else if (currentAuthType == AuthType.OAuth) {
+      assumeValidTestConfigPresent(getRawConfiguration(),
+          FS_AZURE_ACCOUNT_TOKEN_PROVIDER_TYPE_PROPERTY_NAME);
+      assumeValidTestConfigPresent(getRawConfiguration(),
+          FS_AZURE_ACCOUNT_OAUTH_CLIENT_ID);
+      assumeValidTestConfigPresent(getRawConfiguration(),
+          FS_AZURE_ACCOUNT_OAUTH_CLIENT_SECRET);
+      assumeValidTestConfigPresent(getRawConfiguration(),
+          FS_AZURE_ACCOUNT_OAUTH_CLIENT_ENDPOINT);
+    } else if (currentAuthType == AuthType.Custom) {
       assumeValidTestConfigPresent(getRawConfiguration(),
           FS_AZURE_ACCOUNT_TOKEN_PROVIDER_TYPE_PROPERTY_NAME);
     }

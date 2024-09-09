@@ -82,7 +82,7 @@ public class JobControlTestUtils {
   private static String generateRandomLine() {
     long r = rand.nextLong() % 7;
     long n = r + 20;
-    StringBuilder sb = new StringBuilder();
+    StringBuffer sb = new StringBuffer();
     for (int i = 0; i < n; i++) {
       sb.append(generateRandomWord()).append(" ");
     }

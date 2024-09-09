@@ -1906,7 +1906,7 @@ public class FederationInterceptorREST extends AbstractRESTRequestInterceptor {
       ClientMethod remoteMethod = new ClientMethod("addToClusterNodeLabels", argsClasses, args);
       Map<SubClusterInfo, Response> responseInfoMap =
           invokeConcurrent(subClustersActives, remoteMethod, Response.class);
-      StringBuilder buffer = new StringBuilder();
+      StringBuffer buffer = new StringBuffer();
       // SubCluster-0:SUCCESS,SubCluster-1:SUCCESS
       responseInfoMap.forEach((subClusterInfo, response) ->
           buildAppendMsg(subClusterInfo, buffer, response));
@@ -1964,7 +1964,7 @@ public class FederationInterceptorREST extends AbstractRESTRequestInterceptor {
           new ClientMethod("removeFromClusterNodeLabels", argsClasses, args);
       Map<SubClusterInfo, Response> responseInfoMap =
           invokeConcurrent(subClustersActives, remoteMethod, Response.class);
-      StringBuilder buffer = new StringBuilder();
+      StringBuffer buffer = new StringBuffer();
       // SubCluster-0:SUCCESS,SubCluster-1:SUCCESS
       responseInfoMap.forEach((subClusterInfo, response) ->
           buildAppendMsg(subClusterInfo, buffer, response));
@@ -1993,10 +1993,10 @@ public class FederationInterceptorREST extends AbstractRESTRequestInterceptor {
    * Build Append information.
    *
    * @param subClusterInfo subCluster information.
-   * @param buffer StringBuilder.
+   * @param buffer StringBuffer.
    * @param response response message.
    */
-  private void buildAppendMsg(SubClusterInfo subClusterInfo, StringBuilder buffer,
+  private void buildAppendMsg(SubClusterInfo subClusterInfo, StringBuffer buffer,
       Response response) {
     SubClusterId subClusterId = subClusterInfo.getSubClusterId();
     String state = response != null &&

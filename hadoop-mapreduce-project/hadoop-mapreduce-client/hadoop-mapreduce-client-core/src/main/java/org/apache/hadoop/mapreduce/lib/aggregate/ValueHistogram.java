@@ -83,7 +83,7 @@ public class ValueHistogram implements ValueAggregator<String> {
   public String getReport() {
     long[] counts = new long[items.size()];
 
-    StringBuilder sb = new StringBuilder();
+    StringBuffer sb = new StringBuffer();
     Iterator<Object> iter = items.values().iterator();
     int i = 0;
     while (iter.hasNext()) {
@@ -133,7 +133,7 @@ public class ValueHistogram implements ValueAggregator<String> {
    * the histogram
    */
   public String getReportDetails() {
-    StringBuilder sb = new StringBuilder();
+    StringBuffer sb = new StringBuffer();
     Iterator<Entry<Object,Object>> iter = items.entrySet().iterator();
     while (iter.hasNext()) {
       Entry<Object,Object> en = iter.next();

@@ -195,7 +195,7 @@ public class DFSck extends Configured implements Tool {
     final String cookiePrefix = "Cookie:";
     boolean allDone = false;
     while (!allDone) {
-      final StringBuilder url = new StringBuilder(baseUrl);
+      final StringBuffer url = new StringBuffer(baseUrl);
       if (cookie > 0) {
         url.append("&startblockafter=").append(String.valueOf(cookie));
       }

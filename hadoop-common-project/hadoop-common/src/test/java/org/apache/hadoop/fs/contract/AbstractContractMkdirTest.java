@@ -35,9 +35,6 @@ import static org.apache.hadoop.fs.contract.ContractTestUtils.dataset;
  */
 public abstract class AbstractContractMkdirTest extends AbstractFSContractTestBase {
 
-  public static final String MKDIRS_NOT_FAILED_OVER_FILE =
-      "mkdirs did not fail over a file but returned ";
-
   @Test
   public void testMkDirRmDir() throws Throwable {
     FileSystem fs = getFileSystem();
@@ -69,7 +66,7 @@ public abstract class AbstractContractMkdirTest extends AbstractFSContractTestBa
     createFile(getFileSystem(), path, false, dataset);
     try {
       boolean made = fs.mkdirs(path);
-      fail(MKDIRS_NOT_FAILED_OVER_FILE + made
+      fail("mkdirs did not fail over a file but returned " + made
             + "; " + ls(path));
     } catch (ParentNotDirectoryException | FileAlreadyExistsException e) {
       //parent is a directory
@@ -96,7 +93,7 @@ public abstract class AbstractContractMkdirTest extends AbstractFSContractTestBa
     Path child = new Path(path,"child-to-mkdir");
     try {
       boolean made = fs.mkdirs(child);
-      fail(MKDIRS_NOT_FAILED_OVER_FILE + made
+      fail("mkdirs did not fail over a file but returned " + made
            + "; " + ls(path));
     } catch (ParentNotDirectoryException | FileAlreadyExistsException e) {
       //parent is a directory

@@ -119,7 +119,7 @@ public class TestMRCJCFileOutputCommitter {
 
     // validate output
     File expectedFile = new File(new Path(outDir, partFile).toString());
-    StringBuilder expectedOutput = new StringBuilder();
+    StringBuffer expectedOutput = new StringBuffer();
     expectedOutput.append(key1).append('\t').append(val1).append("\n");
     expectedOutput.append(val1).append("\n");
     expectedOutput.append(val2).append("\n");

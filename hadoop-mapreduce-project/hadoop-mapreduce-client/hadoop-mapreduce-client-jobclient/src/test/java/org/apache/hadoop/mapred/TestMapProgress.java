@@ -119,7 +119,7 @@ public class TestMapProgress {
     
     public AMFeedback statusUpdate(TaskAttemptID taskId, TaskStatus taskStatus) 
     throws IOException, InterruptedException {
-      StringBuilder buf = new StringBuilder("Task ");
+      StringBuffer buf = new StringBuffer("Task ");
       buf.append(taskId);
       if (taskStatus != null) {
         buf.append(" making progress to ");

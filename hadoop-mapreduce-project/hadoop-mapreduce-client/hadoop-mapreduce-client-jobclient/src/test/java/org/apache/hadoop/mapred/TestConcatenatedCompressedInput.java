@@ -677,7 +677,7 @@ public class TestConcatenatedCompressedInput {
   }
 
   private static String unquote(String in) {
-    StringBuilder result = new StringBuilder();
+    StringBuffer result = new StringBuffer();
     for(int i=0; i < in.length(); ++i) {
       char ch = in.charAt(i);
       if (ch == '\\') {

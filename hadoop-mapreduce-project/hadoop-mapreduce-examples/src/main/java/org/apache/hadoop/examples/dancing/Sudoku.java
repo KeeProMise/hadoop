@@ -66,7 +66,7 @@ public class Sudoku {
    */
   static String stringifySolution(int size, List<List<ColumnName>> solution) {
     int[][] picture = new int[size][size];
-    StringBuilder result = new StringBuilder();
+    StringBuffer result = new StringBuffer();
     // go through the rows selected in the model and build a picture of the
     // solution.
     for(List<ColumnName> row: solution) {

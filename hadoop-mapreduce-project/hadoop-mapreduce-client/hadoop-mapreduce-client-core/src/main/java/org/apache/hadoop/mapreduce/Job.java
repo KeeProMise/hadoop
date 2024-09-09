@@ -476,7 +476,7 @@ public class Job extends JobContextImpl implements JobContext, AutoCloseable {
     } catch (IOException e) {
     } catch (InterruptedException ie) {
     }
-    StringBuilder sb = new StringBuilder();
+    StringBuffer sb = new StringBuffer();
     sb.append("Job: ").append(status.getJobID()).append("\n");
     sb.append("Job File: ").append(status.getJobFile()).append("\n");
     sb.append("Job Tracking URL : ").append(status.getTrackingUrl());

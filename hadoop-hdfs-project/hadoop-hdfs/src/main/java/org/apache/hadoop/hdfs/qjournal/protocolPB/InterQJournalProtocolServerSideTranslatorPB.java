@@ -24,8 +24,6 @@ import org.apache.hadoop.thirdparty.protobuf.ServiceException;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.qjournal.protocol.InterQJournalProtocol;
-import org.apache.hadoop.hdfs.protocol.proto.HdfsServerProtos.StorageInfoProto;
-import org.apache.hadoop.hdfs.qjournal.protocol.InterQJournalProtocolProtos.GetStorageInfoRequestProto;
 import org.apache.hadoop.hdfs.qjournal.protocol.QJournalProtocolProtos.GetEditLogManifestRequestProto;
 import org.apache.hadoop.hdfs.qjournal.protocol.QJournalProtocolProtos.GetEditLogManifestResponseProto;
 
@@ -58,20 +56,6 @@ public class InterQJournalProtocolServerSideTranslatorPB implements
           request.hasNameServiceId() ? request.getNameServiceId() : null,
           request.getSinceTxId(),
           request.getInProgressOk());
-    } catch (IOException e) {
-      throw new ServiceException(e);
-    }
-  }
-
-  @Override
-  public StorageInfoProto getStorageInfo(
-      RpcController controller, GetStorageInfoRequestProto request)
-      throws ServiceException {
-    try {
-      return impl.getStorageInfo(
-          request.getJid().getIdentifier(),
-          request.hasNameServiceId() ? request.getNameServiceId() : null
-      );
     } catch (IOException e) {
       throw new ServiceException(e);
     }

@@ -80,7 +80,7 @@ public class TestMiniMRClasspath {
     FileSystem fs = FileSystem.get(fileSys, conf);
     configureWordCount(fs, conf, input, numMaps, numReduces, inDir, outDir);
     JobClient.runJob(conf);
-    StringBuilder result = new StringBuilder();
+    StringBuffer result = new StringBuffer();
     {
       Path[] parents = FileUtil.stat2Paths(fs.listStatus(outDir.getParent()));
       Path[] fileList = FileUtil.stat2Paths(fs.listStatus(outDir,
@@ -137,7 +137,7 @@ public class TestMiniMRClasspath {
     // set the tests jar file
     conf.setJarByClass(TestMiniMRClasspath.class);
     JobClient.runJob(conf);
-    StringBuilder result = new StringBuilder();
+    StringBuffer result = new StringBuffer();
     Path[] fileList = FileUtil.stat2Paths(fs.listStatus(outDir,
                                  new Utils.OutputFileUtils
                                           .OutputFilesFilter()));

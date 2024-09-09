@@ -247,7 +247,7 @@ public abstract class AbstractFileSystem implements PathCapabilities {
    * The main factory method for creating a file system. Get a file system for
    * the URI's scheme and authority. The scheme of the <code>uri</code>
    * determines a configuration property name,
-   * <code>fs.AbstractFileSystem.<i>scheme</i>.impl</code> whose value names the
+   * <tt>fs.AbstractFileSystem.<i>scheme</i>.impl</tt> whose value names the
    * AbstractFileSystem class.
    * 
    * The entire URI and conf is passed to the AbstractFileSystem factory method.

@@ -154,7 +154,7 @@ public class RandomTextWriter extends Configured implements Tool {
     }
     
     private Text generateSentence(int noWords) {
-      StringBuilder sentence = new StringBuilder();
+      StringBuffer sentence = new StringBuffer();
       String space = " ";
       for (int i=0; i < noWords; ++i) {
         sentence.append(words[random.nextInt(words.length)]);

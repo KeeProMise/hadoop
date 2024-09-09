@@ -21,8 +21,6 @@ package org.apache.hadoop.fs.s3a;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.fs.s3a.impl.AWSClientConfig;
@@ -86,9 +84,6 @@ public class DefaultS3ClientFactory extends Configured
   private static final String REQUESTER_PAYS_HEADER_VALUE = "requester";
 
   private static final String S3_SERVICE_NAME = "s3";
-
-  private static final Pattern VPC_ENDPOINT_PATTERN =
-          Pattern.compile("^(?:.+\\.)?([a-z0-9-]+)\\.vpce\\.amazonaws\\.(?:com|com\\.cn)$");
 
   /**
    * Subclasses refer to this.
@@ -395,19 +390,10 @@ public class DefaultS3ClientFactory extends Configured
    * @param endpointEndsWithCentral true if the endpoint is configured as central.
    * @return the S3 region, null if unable to resolve from endpoint.
    */
-  @VisibleForTesting
-  static Region getS3RegionFromEndpoint(final String endpoint,
+  private static Region getS3RegionFromEndpoint(final String endpoint,
       final boolean endpointEndsWithCentral) {
 
     if (!endpointEndsWithCentral) {
-      // S3 VPC endpoint parsing
-      Matcher matcher = VPC_ENDPOINT_PATTERN.matcher(endpoint);
-      if (matcher.find()) {
-        LOG.debug("Mapping to VPCE");
-        LOG.debug("Endpoint {} is vpc endpoint; parsing region as {}", endpoint, matcher.group(1));
-        return Region.of(matcher.group(1));
-      }
-
       LOG.debug("Endpoint {} is not the default; parsing", endpoint);
       return AwsHostNameUtils.parseSigningRegion(endpoint, S3_SERVICE_NAME).orElse(null);
     }

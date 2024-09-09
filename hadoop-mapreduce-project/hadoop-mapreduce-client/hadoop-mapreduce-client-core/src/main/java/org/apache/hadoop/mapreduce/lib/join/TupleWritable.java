@@ -144,10 +144,10 @@ public class TupleWritable implements Writable, Iterable<Writable> {
 
   /**
    * Convert Tuple to String as in the following.
-   * <code>[&lt;child1&gt;,&lt;child2&gt;,...,&lt;childn&gt;]</code>
+   * <tt>[&lt;child1&gt;,&lt;child2&gt;,...,&lt;childn&gt;]</tt>
    */
   public String toString() {
-    StringBuilder buf = new StringBuilder("[");
+    StringBuffer buf = new StringBuffer("[");
     for (int i = 0; i < values.length; ++i) {
       buf.append(has(i) ? values[i].toString() : "");
       buf.append(",");

@@ -17,34 +17,49 @@
  */
 package org.apache.hadoop.fs.s3a.yarn;
 
-import java.util.EnumSet;
-
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
-
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.FsStatus;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.s3a.AbstractS3ATestBase;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.Timeout;
+
+import java.util.EnumSet;
 import org.apache.hadoop.fs.s3a.S3ATestUtils;
+
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 /**
  * S3A tests through the {@link FileContext} API.
  */
-public class ITestS3A  extends AbstractS3ATestBase {
+public class ITestS3A {
   private FileContext fc;
 
   @Rule
   public final Timeout testTimeout = new Timeout(90000);
 
+  @Before
+  public void setUp() throws Exception {
+    Configuration conf = new Configuration();
+    fc = S3ATestUtils.createTestFileContext(conf);
+  }
 
-  @Override
-  public void setup() throws Exception {
-    super.setup();
-    fc = S3ATestUtils.createTestFileContext(getConfiguration());
+  @After
+  public void tearDown() throws Exception {
+    if (fc != null) {
+      fc.delete(getTestPath(), true);
+    }
+  }
+
+  protected Path getTestPath() {
+    return S3ATestUtils.createTestPath(new Path("/tests3afc"));
   }
 
   @Test
@@ -62,7 +77,7 @@ public class ITestS3A  extends AbstractS3ATestBase {
 
   @Test
   public void testS3ACreateFileInSubDir() throws Exception {
-    Path dirPath = methodPath();
+    Path dirPath = getTestPath();
     fc.mkdir(dirPath, FileContext.DIR_DEFAULT_PERM, true);
     Path filePath = new Path(dirPath, "file");
     try (FSDataOutputStream file = fc.create(filePath, EnumSet.of(CreateFlag

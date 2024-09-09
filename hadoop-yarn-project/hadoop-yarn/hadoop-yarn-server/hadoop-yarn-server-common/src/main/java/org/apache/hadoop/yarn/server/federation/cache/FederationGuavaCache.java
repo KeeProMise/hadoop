@@ -76,9 +76,7 @@ public class FederationGuavaCache extends FederationCache {
 
   @Override
   public void clearCache() {
-    if (this.cache != null) {
-      cache.invalidateAll();
-    }
+    cache.invalidateAll();
     cache = null;
   }
 

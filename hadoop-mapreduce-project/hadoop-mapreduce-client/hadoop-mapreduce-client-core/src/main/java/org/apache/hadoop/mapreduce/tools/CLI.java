@@ -520,7 +520,7 @@ public class CLI extends Configured implements Tool {
   }
   
   private String getJobPriorityNames() {
-    StringBuilder sb = new StringBuilder();
+    StringBuffer sb = new StringBuffer();
     for (JobPriority p : JobPriority.values()) {
       // UNDEFINED_PRIORITY need not to be displayed in usage
       if (JobPriority.UNDEFINED_PRIORITY == p) {

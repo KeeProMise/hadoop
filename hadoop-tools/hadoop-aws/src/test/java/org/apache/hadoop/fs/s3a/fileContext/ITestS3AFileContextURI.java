@@ -21,8 +21,6 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import static org.apache.hadoop.fs.s3a.S3ATestUtils.setPerformanceFlags;
-
 /**
  * S3a implementation of FileContextURIBase.
  */
@@ -32,9 +30,7 @@ public class ITestS3AFileContextURI extends FileContextURIBase {
 
   @Before
   public void setUp() throws IOException, Exception {
-    conf = setPerformanceFlags(
-        new Configuration(),
-        "");
+    conf = new Configuration();
 
     fc1 = S3ATestUtils.createTestFileContext(conf);
     fc2 = S3ATestUtils.createTestFileContext(conf); //different object, same FS

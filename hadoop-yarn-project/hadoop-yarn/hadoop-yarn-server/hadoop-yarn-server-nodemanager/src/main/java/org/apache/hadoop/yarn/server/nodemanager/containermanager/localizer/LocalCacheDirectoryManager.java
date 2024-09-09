@@ -165,7 +165,7 @@ public class LocalCacheDirectoryManager {
       String relativePath = "";
       if (directoryNo > 0) {
         String tPath = Integer.toString(directoryNo - 1, DIRECTORIES_PER_LEVEL);
-        StringBuilder sb = new StringBuilder();
+        StringBuffer sb = new StringBuffer();
         if (tPath.length() == 1) {
           sb.append(tPath.charAt(0));
         } else {

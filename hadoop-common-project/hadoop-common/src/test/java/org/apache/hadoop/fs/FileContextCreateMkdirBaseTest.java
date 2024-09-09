@@ -27,7 +27,6 @@ import org.junit.Test;
 import static org.apache.hadoop.fs.FileContextTestHelper.*;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.assertIsDirectory;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.assertIsFile;
-import static org.apache.hadoop.test.LambdaTestUtils.intercept;
 
 import org.apache.hadoop.test.GenericTestUtils;
 import org.slf4j.event.Level;
@@ -56,10 +55,7 @@ public abstract class FileContextCreateMkdirBaseTest {
 
   protected final FileContextTestHelper fileContextTestHelper;
   protected static FileContext fc;
-
-  public static final String MKDIR_FILE_PRESENT_ERROR =
-      " should have failed as a file was present";
-
+      
   static {
     GenericTestUtils.setLogLevel(FileSystem.LOG, Level.DEBUG);
   }
@@ -132,7 +128,7 @@ public abstract class FileContextCreateMkdirBaseTest {
   }
 
   @Test
-  public void testMkdirRecursiveWithExistingFile() throws Exception {
+  public void testMkdirRecursiveWithExistingFile() throws IOException {
     Path f = getTestRootPath(fc, "NonExistant3/aDir");
     fc.mkdir(f, FileContext.DEFAULT_PERM, true);
     assertIsDirectory(fc.getFileStatus(f));
@@ -145,12 +141,13 @@ public abstract class FileContextCreateMkdirBaseTest {
 
     // try creating another folder which conflicts with filePath
     Path dirPath = new Path(filePath, "bDir/cDir");
-    intercept(
-        IOException.class,
-        null,
-        "Mkdir for " + dirPath + MKDIR_FILE_PRESENT_ERROR,
-        () -> fc.mkdir(dirPath, FileContext.DEFAULT_PERM, true)
-    );
+    try {
+      fc.mkdir(dirPath, FileContext.DEFAULT_PERM, true);
+      Assert.fail("Mkdir for " + dirPath
+          + " should have failed as a file was present");
+    } catch(IOException e) {
+      // failed as expected
+    }
   }
 
   @Test

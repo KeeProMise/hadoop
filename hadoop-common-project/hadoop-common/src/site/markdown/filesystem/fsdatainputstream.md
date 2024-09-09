@@ -474,6 +474,7 @@ No empty lists.
 
 ```python
 if ranges = null raise NullPointerException
+if ranges.len() = 0 raise IllegalArgumentException
 if allocate = null raise NullPointerException
 ```
 

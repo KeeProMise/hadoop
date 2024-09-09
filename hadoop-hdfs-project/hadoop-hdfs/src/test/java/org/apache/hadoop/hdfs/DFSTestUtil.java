@@ -340,7 +340,7 @@ public class DFSTestUtil {
         for (int idx = 0; idx < nLevels; idx++) {
           levels[idx] = gen.nextInt(10);
         }
-        StringBuilder sb = new StringBuilder();
+        StringBuffer sb = new StringBuffer();
         for (int idx = 0; idx < nLevels; idx++) {
           sb.append(dirNames[levels[idx]]);
           sb.append("/");

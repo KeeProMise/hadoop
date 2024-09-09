@@ -977,7 +977,7 @@ public class TestDevicePluginAdapter {
       if (version.equals("v2")) {
         String nvidiaRuntime = "nvidia";
         String nvidiaVisibleDevices = "NVIDIA_VISIBLE_DEVICES";
-        StringBuilder gpuMinorNumbersSB = new StringBuilder();
+        StringBuffer gpuMinorNumbersSB = new StringBuffer();
         for (Device device : allocatedDevices) {
           gpuMinorNumbersSB.append(device.getMinorNumber() + ",");
         }

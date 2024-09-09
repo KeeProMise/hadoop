@@ -27,8 +27,6 @@ import org.apache.hadoop.fs.contract.AbstractContractRootDirectoryTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 
-import static org.apache.hadoop.fs.s3a.S3ATestUtils.maybeSkipRootTests;
-
 /**
  * root dir operations against an S3 bucket.
  */
@@ -37,12 +35,6 @@ public class ITestS3AContractRootDir extends
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ITestS3AContractRootDir.class);
-
-  @Override
-  public void setup() throws Exception {
-    super.setup();
-    maybeSkipRootTests(getFileSystem().getConf());
-  }
 
   @Override
   protected AbstractFSContract createContract(Configuration conf) {

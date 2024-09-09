@@ -43,26 +43,14 @@ import static org.apache.hadoop.fs.Options.OpenFileOptions.FS_OPTION_OPENFILE_BU
 import static org.apache.hadoop.fs.Options.OpenFileOptions.FS_OPTION_OPENFILE_LENGTH;
 import static org.apache.hadoop.fs.Options.OpenFileOptions.FS_OPTION_OPENFILE_READ_POLICY;
 import static org.apache.hadoop.fs.Options.OpenFileOptions.FS_OPTION_OPENFILE_READ_POLICY_ADAPTIVE;
-import static org.apache.hadoop.fs.Options.OpenFileOptions.FS_OPTION_OPENFILE_READ_POLICY_AVRO;
-import static org.apache.hadoop.fs.Options.OpenFileOptions.FS_OPTION_OPENFILE_READ_POLICY_COLUMNAR;
-import static org.apache.hadoop.fs.Options.OpenFileOptions.FS_OPTION_OPENFILE_READ_POLICY_CSV;
 import static org.apache.hadoop.fs.Options.OpenFileOptions.FS_OPTION_OPENFILE_READ_POLICY_DEFAULT;
-import static org.apache.hadoop.fs.Options.OpenFileOptions.FS_OPTION_OPENFILE_READ_POLICY_HBASE;
-import static org.apache.hadoop.fs.Options.OpenFileOptions.FS_OPTION_OPENFILE_READ_POLICY_JSON;
-import static org.apache.hadoop.fs.Options.OpenFileOptions.FS_OPTION_OPENFILE_READ_POLICY_ORC;
-import static org.apache.hadoop.fs.Options.OpenFileOptions.FS_OPTION_OPENFILE_READ_POLICY_PARQUET;
 import static org.apache.hadoop.fs.Options.OpenFileOptions.FS_OPTION_OPENFILE_READ_POLICY_RANDOM;
 import static org.apache.hadoop.fs.Options.OpenFileOptions.FS_OPTION_OPENFILE_READ_POLICY_SEQUENTIAL;
-import static org.apache.hadoop.fs.Options.OpenFileOptions.FS_OPTION_OPENFILE_READ_POLICY_VECTOR;
-import static org.apache.hadoop.fs.Options.OpenFileOptions.FS_OPTION_OPENFILE_READ_POLICY_WHOLE_FILE;
 import static org.apache.hadoop.fs.Options.OpenFileOptions.FS_OPTION_OPENFILE_SPLIT_END;
 import static org.apache.hadoop.fs.Options.OpenFileOptions.FS_OPTION_OPENFILE_SPLIT_START;
 import static org.apache.hadoop.fs.s3a.Constants.DEFAULT_ASYNC_DRAIN_THRESHOLD;
 import static org.apache.hadoop.fs.s3a.Constants.INPUT_FADVISE;
 import static org.apache.hadoop.fs.s3a.Constants.READAHEAD_RANGE;
-import static org.apache.hadoop.fs.s3a.S3AInputPolicy.Normal;
-import static org.apache.hadoop.fs.s3a.S3AInputPolicy.Random;
-import static org.apache.hadoop.fs.s3a.S3AInputPolicy.Sequential;
 import static org.apache.hadoop.test.LambdaTestUtils.intercept;
 
 /**
@@ -81,7 +69,7 @@ public class TestOpenFileSupport extends HadoopTestBase {
 
   private static final String USERNAME = "hadoop";
 
-  public static final S3AInputPolicy INPUT_POLICY = Sequential;
+  public static final S3AInputPolicy INPUT_POLICY = S3AInputPolicy.Sequential;
 
   public static final String TESTFILE = "s3a://bucket/name";
 
@@ -154,7 +142,7 @@ public class TestOpenFileSupport extends HadoopTestBase {
     // is picked up
     assertOpenFile(INPUT_FADVISE, option)
         .extracting(f -> f.getInputPolicy())
-        .isEqualTo(Random);
+        .isEqualTo(S3AInputPolicy.Random);
     // and as neither status nor length was set: no file status
     assertOpenFile(INPUT_FADVISE, option)
         .extracting(f -> f.getStatus())
@@ -173,7 +161,7 @@ public class TestOpenFileSupport extends HadoopTestBase {
     assertOpenFile(FS_OPTION_OPENFILE_READ_POLICY,
         FS_OPTION_OPENFILE_READ_POLICY_ADAPTIVE)
         .extracting(f -> f.getInputPolicy())
-        .isEqualTo(Normal);
+        .isEqualTo(S3AInputPolicy.Normal);
   }
 
   /**
@@ -196,7 +184,7 @@ public class TestOpenFileSupport extends HadoopTestBase {
     // fall back to the second seek policy if the first is unknown
     assertOpenFile(INPUT_FADVISE, "hbase, random")
         .extracting(f -> f.getInputPolicy())
-        .isEqualTo(Random);
+        .isEqualTo(S3AInputPolicy.Random);
   }
 
   /**
@@ -211,14 +199,14 @@ public class TestOpenFileSupport extends HadoopTestBase {
         FS_OPTION_OPENFILE_READ_POLICY);
     Assertions.assertThat(S3AInputPolicy.getFirstSupportedPolicy(options, null))
         .describedAs("Policy from " + plist)
-        .isEqualTo(Random);
+        .isEqualTo(S3AInputPolicy.Random);
   }
 
   @Test
   public void testAdaptiveSeekPolicyRecognized() throws Throwable {
     Assertions.assertThat(S3AInputPolicy.getPolicy("adaptive", null))
         .describedAs("adaptive")
-        .isEqualTo(Normal);
+        .isEqualTo(S3AInputPolicy.Normal);
   }
 
   @Test
@@ -234,20 +222,11 @@ public class TestOpenFileSupport extends HadoopTestBase {
   @Test
   public void testInputPolicyMapping() throws Throwable {
     Object[][] policyMapping = {
-        {"normal", Normal},
-        {FS_OPTION_OPENFILE_READ_POLICY_ADAPTIVE, Normal},
-        {FS_OPTION_OPENFILE_READ_POLICY_AVRO, Sequential},
-        {FS_OPTION_OPENFILE_READ_POLICY_COLUMNAR, Random},
-        {FS_OPTION_OPENFILE_READ_POLICY_CSV, Sequential},
-        {FS_OPTION_OPENFILE_READ_POLICY_DEFAULT, Normal},
-        {FS_OPTION_OPENFILE_READ_POLICY_HBASE, Random},
-        {FS_OPTION_OPENFILE_READ_POLICY_JSON, Sequential},
-        {FS_OPTION_OPENFILE_READ_POLICY_ORC, Random},
-        {FS_OPTION_OPENFILE_READ_POLICY_PARQUET, Random},
-        {FS_OPTION_OPENFILE_READ_POLICY_RANDOM, Random},
-        {FS_OPTION_OPENFILE_READ_POLICY_SEQUENTIAL, Sequential},
-        {FS_OPTION_OPENFILE_READ_POLICY_VECTOR, Random},
-        {FS_OPTION_OPENFILE_READ_POLICY_WHOLE_FILE, Sequential},
+        {"normal", S3AInputPolicy.Normal},
+        {FS_OPTION_OPENFILE_READ_POLICY_ADAPTIVE, S3AInputPolicy.Normal},
+        {FS_OPTION_OPENFILE_READ_POLICY_DEFAULT, S3AInputPolicy.Normal},
+        {FS_OPTION_OPENFILE_READ_POLICY_RANDOM, S3AInputPolicy.Random},
+        {FS_OPTION_OPENFILE_READ_POLICY_SEQUENTIAL, S3AInputPolicy.Sequential},
     };
     for (Object[] mapping : policyMapping) {
       String name = (String) mapping[0];

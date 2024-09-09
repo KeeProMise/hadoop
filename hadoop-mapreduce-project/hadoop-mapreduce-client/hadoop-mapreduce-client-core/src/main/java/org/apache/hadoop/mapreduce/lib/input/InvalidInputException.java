@@ -60,7 +60,7 @@ public class InvalidInputException extends IOException {
    * @return the concatenated messages from all of the problems.
    */
   public String getMessage() {
-    StringBuilder result = new StringBuilder();
+    StringBuffer result = new StringBuffer();
     Iterator<IOException> itr = problems.iterator();
     while(itr.hasNext()) {
       result.append(itr.next().getMessage());

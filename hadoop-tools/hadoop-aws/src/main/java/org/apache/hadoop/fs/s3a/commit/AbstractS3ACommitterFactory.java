@@ -51,10 +51,9 @@ public abstract class AbstractS3ACommitterFactory
       throw new PathCommitException(outputPath,
           "Filesystem not supported by this committer");
     }
-    LOG.info("Using Committer {} for {} created by {}",
+    LOG.info("Using Committer {} for {}",
         outputCommitter,
-        outputPath,
-        this);
+        outputPath);
     return outputCommitter;
   }
 

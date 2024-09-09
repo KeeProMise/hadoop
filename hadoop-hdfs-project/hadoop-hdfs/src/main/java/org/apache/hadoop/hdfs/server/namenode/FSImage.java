@@ -977,14 +977,10 @@ public class FSImage implements Closeable {
           " but expecting " + expectedMd5);
     }
 
-    final long txId = setLastAppliedTxId(loader);
+    long txId = loader.getLoadedImageTxId();
     LOG.info("Loaded image for txid " + txId + " from " + curFile);
+    lastAppliedTxId = txId;
     storage.setMostRecentCheckpointInfo(txId, curFile.lastModified());
-  }
-
-  synchronized long setLastAppliedTxId(FSImageFormat.LoaderDelegator loader) {
-    lastAppliedTxId = loader.getLoadedImageTxId();
-    return lastAppliedTxId;
   }
 
   /**
@@ -1219,9 +1215,8 @@ public class FSImage implements Closeable {
   }
 
   void save(FSNamesystem src, File dst) throws IOException {
-    final long txid = getCorrectLastAppliedOrWrittenTxId();
-    LOG.info("save fsimage with txid={} to {}", txid, dst.getAbsolutePath());
-    final SaveNamespaceContext context = new SaveNamespaceContext(src, txid, new Canceler());
+    final SaveNamespaceContext context = new SaveNamespaceContext(src,
+        getCorrectLastAppliedOrWrittenTxId(), new Canceler());
     final Storage.StorageDirectory storageDirectory = new Storage.StorageDirectory(dst);
     Files.createDirectories(storageDirectory.getCurrentDir().toPath());
     new FSImageSaver(context, storageDirectory, NameNodeFile.IMAGE).run();

@@ -132,7 +132,7 @@ public class MRBench extends Configured implements Tool{
    */
   private static String pad(long number, int length) {
     String str = String.valueOf(number);
-    StringBuilder value = new StringBuilder();
+    StringBuffer value = new StringBuffer(); 
     for (int i = str.length(); i < length; i++) {
       value.append("0"); 
     }

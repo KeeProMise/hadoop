@@ -81,12 +81,6 @@ public abstract class FileContextMainOperationsBaseTest  {
   protected final FileContextTestHelper fileContextTestHelper =
     createFileContextHelper();
 
-  /**
-   * Create the test helper.
-   * Important: this is invoked during the construction of the base class,
-   * so is very brittle.
-   * @return a test helper.
-   */
   protected FileContextTestHelper createFileContextHelper() {
     return new FileContextTestHelper();
   }
@@ -113,7 +107,7 @@ public abstract class FileContextMainOperationsBaseTest  {
   
   private static final byte[] data = getFileData(numBlocks,
       getDefaultBlockSize());
-
+  
   @Before
   public void setUp() throws Exception {
     File testBuildData = GenericTestUtils.getRandomizedTestDir();

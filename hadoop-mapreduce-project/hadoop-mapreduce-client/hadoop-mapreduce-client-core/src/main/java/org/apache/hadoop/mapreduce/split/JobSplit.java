@@ -123,7 +123,7 @@ public class JobSplit {
     
     @Override
     public String toString() {
-      StringBuilder buf = new StringBuilder();
+      StringBuffer buf = new StringBuffer();
       buf.append("data-size : " + inputDataLength + "\n");
       buf.append("start-offset : " + startOffset + "\n");
       buf.append("locations : " + "\n");

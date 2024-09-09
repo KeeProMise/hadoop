@@ -180,7 +180,7 @@ public class TestHDFSTrash {
       FileSystem fileSystem, Configuration config) throws IOException {
     // generate an unique path per instance
     UUID trashId = UUID.randomUUID();
-    StringBuilder sb = new StringBuilder()
+    StringBuffer sb = new StringBuffer()
         .append(ugi.getUserName())
         .append("-")
         .append(trashId.toString());

@@ -114,7 +114,7 @@ public class TestCredentialProviderFactory {
   }
 
   private static char[] generatePassword(int length) {
-    StringBuilder sb = new StringBuilder();
+    StringBuffer sb = new StringBuffer();
     Random r = new Random();
     for (int i = 0; i < length; i++) {
       sb.append(chars[r.nextInt(chars.length)]);

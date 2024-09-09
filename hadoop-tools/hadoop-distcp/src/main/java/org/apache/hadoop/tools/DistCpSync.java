@@ -614,7 +614,7 @@ class DistCpSync {
     if (sourcePath.equals(renameItem.getSource())) {
       return renameItem.getTarget();
     }
-    StringBuilder sb = new StringBuilder(sourcePath.toString());
+    StringBuffer sb = new StringBuffer(sourcePath.toString());
     String remain =
         sb.substring(renameItem.getSource().toString().length() + 1);
     return new Path(renameItem.getTarget(), remain);

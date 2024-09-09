@@ -104,9 +104,7 @@ class RouterStateIdContext implements AlignmentContext {
         builder.putNamespaceStateIds(k, v.get());
       }
     });
-    if (builder.getNamespaceStateIdsCount() <= maxSizeOfFederatedStateToPropagate) {
-      headerBuilder.setRouterFederatedState(builder.build().toByteString());
-    }
+    headerBuilder.setRouterFederatedState(builder.build().toByteString());
   }
 
   public LongAccumulator getNamespaceStateId(String nsId) {
@@ -157,7 +155,9 @@ class RouterStateIdContext implements AlignmentContext {
 
   @Override
   public void updateResponseState(RpcResponseHeaderProto.Builder header) {
-    setResponseHeaderState(header);
+    if (namespaceIdMap.size() <= maxSizeOfFederatedStateToPropagate) {
+      setResponseHeaderState(header);
+    }
   }
 
   @Override

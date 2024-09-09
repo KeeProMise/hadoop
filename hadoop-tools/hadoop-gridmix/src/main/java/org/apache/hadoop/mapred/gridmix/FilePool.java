@@ -128,7 +128,7 @@ class FilePool {
 
     /**
      * Return a set of files whose cumulative size is at least
-     * <code>targetSize</code>.
+     * <tt>targetSize</tt>.
      * TODO Clearly size is not the only criterion, e.g. refresh from
      * generated data without including running task output, tolerance
      * for permission issues, etc.

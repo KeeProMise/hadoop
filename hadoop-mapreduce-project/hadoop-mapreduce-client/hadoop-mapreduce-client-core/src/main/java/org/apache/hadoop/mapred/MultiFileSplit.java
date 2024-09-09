@@ -70,7 +70,7 @@ public class MultiFileSplit extends CombineFileSplit {
 
   @Override
   public String toString() {
-    StringBuilder sb = new StringBuilder();
+    StringBuffer sb = new StringBuffer();
     for(int i=0; i < getPaths().length; i++) {
       sb.append(getPath(i).toUri().getPath() + ":0+" + getLength(i));
       if (i < getPaths().length -1) {

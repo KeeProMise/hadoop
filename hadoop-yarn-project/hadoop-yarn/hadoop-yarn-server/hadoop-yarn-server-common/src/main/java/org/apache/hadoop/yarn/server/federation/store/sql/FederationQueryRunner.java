@@ -181,7 +181,7 @@ public class FederationQueryRunner {
       causeMessage = "";
     }
 
-    StringBuilder msg = new StringBuilder(causeMessage);
+    StringBuffer msg = new StringBuffer(causeMessage);
     msg.append(" Query: ");
     msg.append(sql);
     msg.append(" Parameters: ");

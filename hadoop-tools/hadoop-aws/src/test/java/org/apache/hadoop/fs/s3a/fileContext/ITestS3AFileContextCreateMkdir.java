@@ -13,12 +13,11 @@
  */
 package org.apache.hadoop.fs.s3a.fileContext;
 
+import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileContextCreateMkdirBaseTest;
 import org.apache.hadoop.fs.s3a.S3ATestUtils;
 import org.junit.Before;
-
-import static org.apache.hadoop.fs.s3a.S3ATestUtils.setPerformanceFlags;
 
 /**
  * Extends FileContextCreateMkdirBaseTest for a S3a FileContext.
@@ -27,10 +26,8 @@ public class ITestS3AFileContextCreateMkdir
         extends FileContextCreateMkdirBaseTest {
 
   @Before
-  public void setUp() throws Exception {
-    Configuration conf = setPerformanceFlags(
-        new Configuration(),
-        null);
+  public void setUp() throws IOException, Exception {
+    Configuration conf = new Configuration();
     fc = S3ATestUtils.createTestFileContext(conf);
     super.setUp();
   }

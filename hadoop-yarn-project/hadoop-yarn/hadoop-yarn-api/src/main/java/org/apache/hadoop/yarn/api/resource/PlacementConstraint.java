@@ -413,7 +413,7 @@ public class PlacementConstraint {
 
     @Override
     public String toString() {
-      StringBuilder sb = new StringBuilder();
+      StringBuffer sb = new StringBuffer();
       if (TargetType.ALLOCATION_TAG == this.targetType) {
         // following by a comma separated tags
         sb.append(String.join(",", getTargetValues()));
@@ -643,7 +643,7 @@ public class PlacementConstraint {
 
     @Override
     public String toString() {
-      StringBuilder sb = new StringBuilder();
+      StringBuffer sb = new StringBuffer();
       sb.append("cardinality").append(",").append(getScope()).append(",");
       for (String tag : getAllocationTags()) {
         sb.append(tag).append(",");
@@ -717,7 +717,7 @@ public class PlacementConstraint {
 
     @Override
     public String toString() {
-      StringBuilder sb = new StringBuilder();
+      StringBuffer sb = new StringBuffer();
       sb.append("and(");
       Iterator<AbstractConstraint> it = getChildren().iterator();
       while (it.hasNext()) {
@@ -759,7 +759,7 @@ public class PlacementConstraint {
 
     @Override
     public String toString() {
-      StringBuilder sb = new StringBuilder();
+      StringBuffer sb = new StringBuffer();
       sb.append("or(");
       Iterator<AbstractConstraint> it = getChildren().iterator();
       while (it.hasNext()) {
@@ -805,7 +805,7 @@ public class PlacementConstraint {
 
     @Override
     public String toString() {
-      StringBuilder sb = new StringBuilder();
+      StringBuffer sb = new StringBuffer();
       sb.append("DelayedOr(");
       Iterator<TimedPlacementConstraint> it = getChildren().iterator();
       while (it.hasNext()) {

@@ -763,7 +763,7 @@ public class TestMapRed extends Configured implements Tool {
       SequenceFile.Writer writer = SequenceFile.createWriter(fs, conf, inFile,
                                                              Text.class, Text.class);
 
-      StringBuilder content = new StringBuilder();
+      StringBuffer content = new StringBuffer();
 
       for (int i = 0; i < 1000; i++) {
         content.append(i).append(": This is one more line of content\n");

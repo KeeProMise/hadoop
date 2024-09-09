@@ -63,19 +63,18 @@ public final class AbfsClientTestUtil {
 
   public static void setMockAbfsRestOperationForListPathOperation(
       final AbfsClient spiedClient,
-      FunctionRaisingIOE<AbfsJdkHttpOperation, AbfsJdkHttpOperation> functionRaisingIOE)
+      FunctionRaisingIOE<AbfsHttpOperation, AbfsHttpOperation> functionRaisingIOE)
       throws Exception {
     ExponentialRetryPolicy exponentialRetryPolicy = Mockito.mock(ExponentialRetryPolicy.class);
     StaticRetryPolicy staticRetryPolicy = Mockito.mock(StaticRetryPolicy.class);
     AbfsThrottlingIntercept intercept = Mockito.mock(AbfsThrottlingIntercept.class);
-    AbfsJdkHttpOperation httpOperation = Mockito.mock(AbfsJdkHttpOperation.class);
+    AbfsHttpOperation httpOperation = Mockito.mock(AbfsHttpOperation.class);
     AbfsRestOperation abfsRestOperation = Mockito.spy(new AbfsRestOperation(
         AbfsRestOperationType.ListPaths,
         spiedClient,
         HTTP_METHOD_GET,
         null,
-        new ArrayList<>(),
-        spiedClient.getAbfsConfiguration()
+        new ArrayList<>()
     ));
 
     Mockito.doReturn(abfsRestOperation).when(spiedClient).getAbfsRestOperation(
@@ -100,6 +99,7 @@ public final class AbfsClientTestUtil {
     HttpURLConnection httpURLConnection = Mockito.mock(HttpURLConnection.class);
     Mockito.doNothing().when(httpURLConnection)
         .setRequestProperty(nullable(String.class), nullable(String.class));
+    Mockito.doReturn(httpURLConnection).when(httpOperation).getConnection();
     Mockito.doReturn("").when(abfsRestOperation).getClientLatency();
     Mockito.doReturn(httpOperation).when(abfsRestOperation).createHttpOperation();
   }

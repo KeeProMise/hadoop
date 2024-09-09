@@ -22,12 +22,11 @@
 Typed bytes are sequences of bytes in which the first byte is a type code. They are especially useful as a 
 (simple and very straightforward) binary format for transferring data to and from Hadoop Streaming programs.
 
-<h2>Type Codes</h2>
+<h3>Type Codes</h3>
 
 Each typed bytes sequence starts with an unsigned byte that contains the type code. Possible values are:
 
-<table border="1">
-<caption>"Type Codes"</caption>
+<table border="1" cellpadding="2" summary="Type Codes">
 <tr><th>Code</th><th>Type</th></tr>
 <tr><td><i>0</i></td><td>A sequence of bytes.</td></tr>
 <tr><td><i>1</i></td><td>A byte.</td></tr>
@@ -49,8 +48,7 @@ application-specific serialization.
 
 These are the subsequent bytes for the different type codes (everything is big-endian and unpadded):
 
-<table border="1">
-<caption>"Subsequent Bytes"</caption>
+<table border="1" cellpadding="2" summary="Subsequent Bytes">
 <tr><th>Code</th><th>Subsequent Bytes</th></tr>
 <tr><td><i>0</i></td><td>&lt;32-bit signed integer&gt; &lt;as many bytes as indicated by the integer&gt;</td></tr>
 <tr><td><i>1</i></td><td>&lt;signed byte&gt;</td></tr>

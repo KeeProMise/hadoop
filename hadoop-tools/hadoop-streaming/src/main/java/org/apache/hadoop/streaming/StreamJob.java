@@ -291,7 +291,7 @@ public class StreamJob implements Tool {
         LOG.warn("-file option is deprecated, please use generic option" +
         		" -files instead.");
 
-        StringBuilder fileList = new StringBuilder();
+        StringBuffer fileList = new StringBuffer();
         for (String file : values) {
           packageFiles_.add(file);
           try {

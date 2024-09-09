@@ -91,7 +91,7 @@ public class UtilsForTests {
   }
 
   public static String formatBytes(long numBytes) {
-    StringBuilder buf = new StringBuilder();
+    StringBuffer buf = new StringBuffer();
     boolean bDetails = true;
     double num = numBytes;
 
@@ -116,7 +116,7 @@ public class UtilsForTests {
   }
 
   public static String formatBytes2(long numBytes) {
-    StringBuilder buf = new StringBuilder();
+    StringBuffer buf = new StringBuffer();
     long u = 0;
     if (numBytes >= TB) {
       u = numBytes / TB;
@@ -145,7 +145,7 @@ public class UtilsForTests {
   static final String regexpSpecials = "[]()?*+|.!^-\\~@";
 
   public static String regexpEscape(String plain) {
-    StringBuilder buf = new StringBuilder();
+    StringBuffer buf = new StringBuffer();
     char[] ch = plain.toCharArray();
     int csup = ch.length;
     for (int c = 0; c < csup; c++) {

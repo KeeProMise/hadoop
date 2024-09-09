@@ -25,7 +25,6 @@ import org.apache.hadoop.hdfs.server.federation.resolver.order.AvailableSpaceRes
 import org.apache.hadoop.hdfs.server.federation.resolver.order.DestinationOrder;
 import org.apache.hadoop.hdfs.server.federation.resolver.order.HashFirstResolver;
 import org.apache.hadoop.hdfs.server.federation.resolver.order.HashResolver;
-import org.apache.hadoop.hdfs.server.federation.resolver.order.LeaderFollowerResolver;
 import org.apache.hadoop.hdfs.server.federation.resolver.order.LocalResolver;
 import org.apache.hadoop.hdfs.server.federation.resolver.order.OrderedResolver;
 import org.apache.hadoop.hdfs.server.federation.resolver.order.RandomResolver;
@@ -79,8 +78,8 @@ public class MultipleDestinationMountTableResolver extends MountTableResolver {
     addResolver(DestinationOrder.LOCAL, new LocalResolver(conf, router));
     addResolver(DestinationOrder.RANDOM, new RandomResolver());
     addResolver(DestinationOrder.HASH_ALL, new HashResolver());
-    addResolver(DestinationOrder.SPACE, new AvailableSpaceResolver(conf, router));
-    addResolver(DestinationOrder.LEADER_FOLLOWER, new LeaderFollowerResolver());
+    addResolver(DestinationOrder.SPACE,
+        new AvailableSpaceResolver(conf, router));
   }
 
   @Override

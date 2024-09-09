@@ -722,7 +722,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     }
     Path expectedFile = getPart0000(dir);
     log().debug("Validating content in {}", expectedFile);
-    StringBuilder expectedOutput = new StringBuilder();
+    StringBuffer expectedOutput = new StringBuffer();
     expectedOutput.append(KEY_1).append('\t').append(VAL_1).append("\n");
     expectedOutput.append(VAL_1).append("\n");
     expectedOutput.append(VAL_2).append("\n");

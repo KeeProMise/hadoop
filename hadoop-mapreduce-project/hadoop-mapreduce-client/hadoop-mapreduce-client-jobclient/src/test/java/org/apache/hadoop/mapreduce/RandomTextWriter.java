@@ -100,7 +100,7 @@ public class RandomTextWriter extends Configured implements Tool {
 
   public static String generateSentenceWithRand(ThreadLocalRandom rand,
       int noWords) {
-    StringBuilder sentence = new StringBuilder(words[rand.nextInt(words.length)]);
+    StringBuffer sentence = new StringBuffer(words[rand.nextInt(words.length)]);
     for (int i = 1; i < noWords; i++) {
       sentence.append(" ").append(words[rand.nextInt(words.length)]);
     }

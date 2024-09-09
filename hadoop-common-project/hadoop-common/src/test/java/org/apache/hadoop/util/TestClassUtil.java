@@ -20,47 +20,21 @@ package org.apache.hadoop.util;
 
 import java.io.File;
 
-import org.apache.hadoop.fs.viewfs.ViewFileSystem;
+import org.junit.Assert;
 
-import org.assertj.core.api.Assertions;
+import org.apache.log4j.Logger;
 import org.junit.Test;
 
 public class TestClassUtil {
-
   @Test(timeout=10000)
   public void testFindContainingJar() {
-    String containingJar = ClassUtil.findContainingJar(Assertions.class);
-    Assertions
-        .assertThat(containingJar)
-        .describedAs("Containing jar for %s", Assertions.class)
-        .isNotNull();
+    String containingJar = ClassUtil.findContainingJar(Logger.class);
+    Assert.assertNotNull("Containing jar not found for Logger", 
+        containingJar);
     File jarFile = new File(containingJar);
-    Assertions
-        .assertThat(jarFile)
-        .describedAs("Containing jar %s", jarFile)
-        .exists();
-    Assertions
-        .assertThat(jarFile.getName())
-        .describedAs("Containing jar name %s", jarFile.getName())
-        .matches("assertj-core.*[.]jar");
+    Assert.assertTrue("Containing jar does not exist on file system ",
+        jarFile.exists());
+    Assert.assertTrue("Incorrect jar file " + containingJar,
+        jarFile.getName().matches("reload4j.*[.]jar"));
   }
-
-  @Test(timeout = 10000)
-  public void testFindContainingClass() {
-    String classFileLocation = ClassUtil.findClassLocation(ViewFileSystem.class);
-    Assertions
-        .assertThat(classFileLocation)
-        .describedAs("Class path for %s", ViewFileSystem.class)
-        .isNotNull();
-    File classFile = new File(classFileLocation);
-    Assertions
-        .assertThat(classFile)
-        .describedAs("Containing class file %s", classFile)
-        .exists();
-    Assertions
-        .assertThat(classFile.getName())
-        .describedAs("Containing class file name %s", classFile.getName())
-        .matches("ViewFileSystem.class");
-  }
-
 }

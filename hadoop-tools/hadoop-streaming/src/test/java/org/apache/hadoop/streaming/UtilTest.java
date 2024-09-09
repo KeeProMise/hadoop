@@ -86,7 +86,7 @@ class UtilTest {
   }
 
   public static String collate(List<String> args, String sep) {
-    StringBuilder buf = new StringBuilder();
+    StringBuffer buf = new StringBuffer();
     Iterator<String> it = args.iterator();
     while (it.hasNext()) {
       if (buf.length() > 0) {

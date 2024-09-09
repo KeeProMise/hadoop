@@ -1120,7 +1120,7 @@ public class NameNode extends ReconfigurableBase implements
    * <li>{@link StartupOption#IMPORT IMPORT} - import checkpoint</li>
    * </ul>
    * The option is passed via configuration field: 
-   * <code>dfs.namenode.startup</code>
+   * <tt>dfs.namenode.startup</tt>
    * 
    * The conf will be modified to reflect the actual ports on which 
    * the NameNode is up and running if the user passes the port as

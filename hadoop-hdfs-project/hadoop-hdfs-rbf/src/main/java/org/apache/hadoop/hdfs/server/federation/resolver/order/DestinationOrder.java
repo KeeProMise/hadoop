@@ -29,14 +29,11 @@ public enum DestinationOrder {
   LOCAL, // Local first
   RANDOM, // Random order
   HASH_ALL, // Follow consistent hashing
-  SPACE, // Available space based order
-  LEADER_FOLLOWER; // Try leader sub-cluster first, if failed, try followers
+  SPACE; // Available space based order
 
   /** Approaches that write folders in all subclusters. */
   public static final EnumSet<DestinationOrder> FOLDER_ALL = EnumSet.of(
       HASH_ALL,
       RANDOM,
-      SPACE,
-      // leader-follower mode should make sure all directory exists in case of switching
-      LEADER_FOLLOWER);
+      SPACE);
 }

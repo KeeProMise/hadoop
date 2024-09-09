@@ -227,7 +227,7 @@ public class TestFileOutputCommitter {
   private void validateContent(File dir) throws IOException {
     File expectedFile = new File(dir, partFile);
     assertTrue("Could not find "+expectedFile, expectedFile.exists());
-    StringBuilder expectedOutput = new StringBuilder();
+    StringBuffer expectedOutput = new StringBuffer();
     expectedOutput.append(key1).append('\t').append(val1).append("\n");
     expectedOutput.append(val1).append("\n");
     expectedOutput.append(val2).append("\n");

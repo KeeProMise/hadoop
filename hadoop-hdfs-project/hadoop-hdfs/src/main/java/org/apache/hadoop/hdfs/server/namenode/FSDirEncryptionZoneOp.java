@@ -533,16 +533,16 @@ final class FSDirEncryptionZoneOp {
   }
 
   /**
-   * Best-effort attempt to proactively warm up the edek cache. We'll get all the edek key names,
-   * then launch up a separate thread to warm them up. Retries happen if any of keys fail to warm up.
+   * Proactively warm up the edek cache. We'll get all the edek key names,
+   * then launch up a separate thread to warm them up.
    */
   static void warmUpEdekCache(final ExecutorService executor,
-      final FSDirectory fsd, final int delay, final int interval, final int maxRetries) {
+      final FSDirectory fsd, final int delay, final int interval) {
     fsd.readLock();
     try {
       String[] edeks  = fsd.ezManager.getKeyNames();
       executor.execute(
-          new EDEKCacheLoader(edeks, fsd.getProvider(), delay, interval, maxRetries));
+          new EDEKCacheLoader(edeks, fsd.getProvider(), delay, interval));
     } finally {
       fsd.readUnlock();
     }
@@ -557,22 +557,19 @@ final class FSDirEncryptionZoneOp {
     private final KeyProviderCryptoExtension kp;
     private int initialDelay;
     private int retryInterval;
-    private int maxRetries;
 
     EDEKCacheLoader(final String[] names, final KeyProviderCryptoExtension kp,
-        final int delay, final int interval, final int maxRetries) {
+        final int delay, final int interval) {
       this.keyNames = names;
       this.kp = kp;
       this.initialDelay = delay;
       this.retryInterval = interval;
-      this.maxRetries = maxRetries;
     }
 
     @Override
     public void run() {
       NameNode.LOG.info("Warming up {} EDEKs... (initialDelay={}, "
-              + "retryInterval={}, maxRetries={})", keyNames.length, initialDelay, retryInterval,
-          maxRetries);
+          + "retryInterval={})", keyNames.length, initialDelay, retryInterval);
       try {
         Thread.sleep(initialDelay);
       } catch (InterruptedException ie) {
@@ -580,39 +577,42 @@ final class FSDirEncryptionZoneOp {
         return;
       }
 
+      final int logCoolDown = 10000; // periodically print error log (if any)
+      int sinceLastLog = logCoolDown; // always print the first failure
       boolean success = false;
-      int retryCount = 0;
       IOException lastSeenIOE = null;
       long warmUpEDEKStartTime = monotonicNow();
-
-      while (!success && retryCount < maxRetries) {
+      while (true) {
         try {
           kp.warmUpEncryptedKeys(keyNames);
-          NameNode.LOG.info("Successfully warmed up {} EDEKs.", keyNames.length);
+          NameNode.LOG
+              .info("Successfully warmed up {} EDEKs.", keyNames.length);
           success = true;
+          break;
         } catch (IOException ioe) {
           lastSeenIOE = ioe;
-          NameNode.LOG.info("Failed to warm up EDEKs.", ioe);
+          if (sinceLastLog >= logCoolDown) {
+            NameNode.LOG.info("Failed to warm up EDEKs.", ioe);
+            sinceLastLog = 0;
+          } else {
+            NameNode.LOG.debug("Failed to warm up EDEKs.", ioe);
+          }
         } catch (Exception e) {
           NameNode.LOG.error("Cannot warm up EDEKs.", e);
           throw e;
         }
-
-        if (!success) {
-          try {
-            Thread.sleep(retryInterval);
-          } catch (InterruptedException ie) {
-            NameNode.LOG.info("EDEKCacheLoader interrupted during retry.");
-            break;
-          }
-          retryCount++;
+        try {
+          Thread.sleep(retryInterval);
+        } catch (InterruptedException ie) {
+          NameNode.LOG.info("EDEKCacheLoader interrupted during retry.");
+          break;
         }
+        sinceLastLog += retryInterval;
       }
-
       long warmUpEDEKTime = monotonicNow() - warmUpEDEKStartTime;
       NameNode.getNameNodeMetrics().addWarmUpEDEKTime(warmUpEDEKTime);
       if (!success) {
-        NameNode.LOG.warn("Max retry {} reached, unable to warm up EDEKs.", maxRetries);
+        NameNode.LOG.warn("Unable to warm up EDEKs.");
         if (lastSeenIOE != null) {
           NameNode.LOG.warn("Last seen exception:", lastSeenIOE);
         }

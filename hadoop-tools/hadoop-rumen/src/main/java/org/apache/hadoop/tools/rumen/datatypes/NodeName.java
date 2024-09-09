@@ -140,7 +140,7 @@ public class NodeName implements AnonymizableDataType<String> {
   }
   
   private void anonymize(StatePool pool) {
-    StringBuilder buf = new StringBuilder();
+    StringBuffer buf = new StringBuffer();
     NodeNameState state = (NodeNameState) pool.getState(getClass());
     if (state == null) {
       state = new NodeNameState();

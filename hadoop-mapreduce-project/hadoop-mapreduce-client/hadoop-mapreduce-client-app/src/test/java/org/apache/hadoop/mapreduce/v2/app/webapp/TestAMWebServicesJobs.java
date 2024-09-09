@@ -600,7 +600,7 @@ public class TestAMWebServicesJobs extends JerseyTestBase {
     String diagString = "";
     List<String> diagList = job.getDiagnostics();
     if (diagList != null && !diagList.isEmpty()) {
-      StringBuilder b = new StringBuilder();
+      StringBuffer b = new StringBuffer();
       for (String diag : diagList) {
         b.append(diag);
       }

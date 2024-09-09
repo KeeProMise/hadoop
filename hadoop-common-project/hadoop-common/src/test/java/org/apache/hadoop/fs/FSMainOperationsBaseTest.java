@@ -102,9 +102,7 @@ public abstract class FSMainOperationsBaseTest extends FileSystemTestHelper {
   
   @After
   public void tearDown() throws Exception {
-    if (fSys != null) {
-      fSys.delete(new Path(getAbsoluteTestRootPath(fSys), new Path("test")), true);
-    }
+    fSys.delete(new Path(getAbsoluteTestRootPath(fSys), new Path("test")), true);
   }
   
   
@@ -194,7 +192,7 @@ public abstract class FSMainOperationsBaseTest extends FileSystemTestHelper {
   
   @Test
   public void testWDAbsolute() throws IOException {
-    Path absoluteDir = getTestRootPath(fSys, "test/existingDir");
+    Path absoluteDir = new Path(fSys.getUri() + "/test/existingDir");
     fSys.mkdirs(absoluteDir);
     fSys.setWorkingDirectory(absoluteDir);
     Assert.assertEquals(absoluteDir, fSys.getWorkingDirectory());

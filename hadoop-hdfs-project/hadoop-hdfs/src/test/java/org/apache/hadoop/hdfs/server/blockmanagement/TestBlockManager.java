@@ -1833,7 +1833,7 @@ public class TestBlockManager {
     DataInputStream in = new DataInputStream(fstream);
 
     BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-    StringBuilder buffer = new StringBuilder();
+    StringBuffer buffer = new StringBuffer();
     String line;
     try {
       while ((line = reader.readLine()) != null) {
@@ -1861,7 +1861,7 @@ public class TestBlockManager {
     FileInputStream fstream = new FileInputStream(file);
     DataInputStream in = new DataInputStream(fstream);
     BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-    StringBuilder buffer = new StringBuilder();
+    StringBuffer buffer = new StringBuffer();
     String line;
     try {
       while ((line = reader.readLine()) != null) {
@@ -1933,7 +1933,7 @@ public class TestBlockManager {
     FileInputStream fstream = new FileInputStream(file);
     DataInputStream in = new DataInputStream(fstream);
     BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-    StringBuilder buffer = new StringBuilder();
+    StringBuffer buffer = new StringBuffer();
     String line;
     try {
       while ((line = reader.readLine()) != null) {
@@ -1989,7 +1989,7 @@ public class TestBlockManager {
     FileInputStream fstream = new FileInputStream(file);
     DataInputStream in = new DataInputStream(fstream);
     BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-    StringBuilder buffer = new StringBuilder();
+    StringBuffer buffer = new StringBuffer();
     String line;
     try {
       while ((line = reader.readLine()) != null) {

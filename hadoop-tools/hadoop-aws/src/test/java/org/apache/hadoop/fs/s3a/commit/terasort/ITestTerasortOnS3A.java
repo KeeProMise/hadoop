@@ -20,7 +20,6 @@ package org.apache.hadoop.fs.s3a.commit.terasort;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collection;
@@ -44,7 +43,6 @@ import org.apache.hadoop.examples.terasort.TeraSort;
 import org.apache.hadoop.examples.terasort.TeraSortConfigKeys;
 import org.apache.hadoop.examples.terasort.TeraValidate;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.s3a.S3ATestUtils;
 import org.apache.hadoop.fs.s3a.commit.AbstractYarnClusterITest;
 import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitter;
@@ -120,7 +118,7 @@ public class ITestTerasortOnS3A extends AbstractYarnClusterITest {
    *
    * @return the committer binding for this run.
    */
-  @Parameterized.Parameters(name = "{0}-memory={1}")
+  @Parameterized.Parameters(name = "{0}")
   public static Collection<Object[]> params() {
     return Arrays.asList(new Object[][]{
         {DirectoryStagingCommitter.NAME, false},
@@ -143,11 +141,6 @@ public class ITestTerasortOnS3A extends AbstractYarnClusterITest {
     super.setup();
     requireScaleTestsEnabled();
     prepareToTerasort();
-  }
-
-  @Override
-  protected void deleteTestDirInTeardown() throws IOException {
-    /* no-op */
   }
 
   /**
@@ -187,14 +180,14 @@ public class ITestTerasortOnS3A extends AbstractYarnClusterITest {
    * The paths used must be unique across parameterized runs but
    * common across all test cases in a single parameterized run.
    */
-  private void prepareToTerasort() throws IOException {
+  private void prepareToTerasort() {
     // small sample size for faster runs
-    terasortPath = getFileSystem().qualify(
-        new Path(S3ATestUtils.createTestPath(new Path("terasort-test")),
-            "terasort-" + committerName + "-" + trackCommitsInMemory));
+    terasortPath = new Path("/terasort-" + committerName + "-" + trackCommitsInMemory)
+        .makeQualified(getFileSystem());
     sortInput = new Path(terasortPath, "sortin");
     sortOutput = new Path(terasortPath, "sortout");
     sortValidate = new Path(terasortPath, "validate");
+
   }
 
   /**
@@ -261,7 +254,7 @@ public class ITestTerasortOnS3A extends AbstractYarnClusterITest {
    */
   @Test
   public void test_100_terasort_setup() throws Throwable {
-    describe("Setting up for a terasort with path of %s", terasortPath);
+    describe("Setting up for a terasort");
 
     getFileSystem().delete(terasortPath, true);
     completedStages = new HashMap<>();
@@ -346,8 +339,7 @@ public class ITestTerasortOnS3A extends AbstractYarnClusterITest {
     stage.accept("teravalidate");
     stage.accept("overall");
     String text = results.toString();
-    File resultsFile = new File(getReportDir(),
-        String.format("%s-%s.csv", committerName, trackCommitsInMemory));
+    File resultsFile = new File(getReportDir(), committerName + ".csv");
     FileUtils.write(resultsFile, text, StandardCharsets.UTF_8);
     LOG.info("Results are in {}\n{}", resultsFile, text);
   }

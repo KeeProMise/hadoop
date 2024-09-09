@@ -401,7 +401,7 @@ public class TestAggregatedLogFormat {
         new BufferedReader(new FileReader(new File(remoteAppLogFile
             .toUri().getRawPath())));
     String line;
-    StringBuilder sb = new StringBuilder("");
+    StringBuffer sb = new StringBuffer("");
     while ((line = in.readLine()) != null) {
       LOG.info(line);
       sb.append(line);

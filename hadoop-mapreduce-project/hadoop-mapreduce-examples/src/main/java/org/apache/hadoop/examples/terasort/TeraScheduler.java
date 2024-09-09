@@ -47,7 +47,7 @@ class TeraScheduler {
       this.filename = filename;
     }
     public String toString() {
-      StringBuilder result = new StringBuilder();
+      StringBuffer result = new StringBuffer();
       result.append(filename);
       result.append(" on ");
       for(Host host: locations) {
@@ -64,7 +64,7 @@ class TeraScheduler {
       this.hostname = hostname;
     }
     public String toString() {
-      StringBuilder result = new StringBuilder();
+      StringBuffer result = new StringBuffer();
       result.append(splits.size());
       result.append(" ");
       result.append(hostname);
