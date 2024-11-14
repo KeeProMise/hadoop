@@ -708,7 +708,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
    * @throws StandbyException If the Router is in safe mode and cannot serve
    *                           client requests.
    */
-  void checkOperation(OperationCategory op)
+  public void checkOperation(OperationCategory op)
       throws StandbyException {
     // Log the function we are currently calling.
     if (rpcMonitor != null) {
@@ -811,7 +811,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
    * @return the response received after invoking method.
    * @throws IOException
    */
-  <T> T invokeAtAvailableNsAsync(RemoteMethod method, Class<T> clazz)
+  public <T> T invokeAtAvailableNsAsync(RemoteMethod method, Class<T> clazz)
       throws IOException {
     String nsId = subclusterResolver.getDefaultNamespace();
     // If default Ns is not present return result from first namespace.
@@ -2129,7 +2129,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
    * @param clazz Class of the values.
    * @return Array with the outputs.
    */
-  static <T> T[] merge(
+  public static <T> T[] merge(
       Map<FederationNamespaceInfo, T[]> map, Class<T> clazz) {
 
     // Put all results into a set to avoid repeats
