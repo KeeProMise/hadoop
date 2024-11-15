@@ -462,7 +462,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
   /**
    * Init router async handlers and router async responders.
    */
-  protected void initAsyncThreadPool() {
+  public void initAsyncThreadPool() {
     int asyncHandlerCount = conf.getInt(DFS_ROUTER_RPC_ASYNC_HANDLER_COUNT,
         DFS_ROUTER_RPC_ASYNC_HANDLER_COUNT_DEFAULT);
     int asyncResponderCount = conf.getInt(DFS_ROUTER_RPC_ASYNC_RESPONDER_COUNT,
@@ -605,7 +605,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
    * @return routerStateIdContext
    */
   @VisibleForTesting
-  protected RouterStateIdContext getRouterStateIdContext() {
+  public RouterStateIdContext getRouterStateIdContext() {
     return routerStateIdContext;
   }
 
@@ -774,8 +774,9 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
    * If the namespace is unavailable, retry with other namespaces.
    * @param <T> expected return type.
    * @param method the remote method.
+   * @param clazz the type of return value.
    * @return the response received after invoking method.
-   * @throws IOException
+   * @throws IOException if there is no namespace available or other ioExceptions.
    */
   <T> T invokeAtAvailableNs(RemoteMethod method, Class<T> clazz)
       throws IOException {
@@ -808,8 +809,9 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
    * Asynchronous version of invokeAtAvailableNs method.
    * @param <T> expected return type.
    * @param method the remote method.
+   * @param clazz the type of return value.
    * @return the response received after invoking method.
-   * @throws IOException
+   * @throws IOException if there is no namespace available or other ioExceptions.
    */
   public <T> T invokeAtAvailableNsAsync(RemoteMethod method, Class<T> clazz)
       throws IOException {
@@ -849,7 +851,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
    * @param ioe    IOException .
    * @param nss    List of name spaces in the federation
    * @return the response received after invoking method.
-   * @throws IOException
+   * @throws IOException if there is no namespace available or other ioExceptions.
    */
   <T> T invokeOnNs(RemoteMethod method, Class<T> clazz, IOException ioe,
       Set<FederationNamespaceInfo> nss) throws IOException {
@@ -883,7 +885,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
    * @param ioe    IOException .
    * @param nss    List of name spaces in the federation
    * @return the response received after invoking method.
-   * @throws IOException
+   * @throws IOException if there is no namespace available or other ioExceptions.
    */
   <T> T invokeOnNsAsync(RemoteMethod method, Class<T> clazz, IOException ioe,
       Set<FederationNamespaceInfo> nss) throws IOException {
