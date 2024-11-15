@@ -25,7 +25,7 @@ import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.as
 import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncComplete;
 import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncReturn;
 
-public class RouterAsyncUserProtocol implements RouterUserProtocol {
+public class RouterAsyncUserProtocol extends RouterUserProtocol {
   private static final Logger LOG =
       LoggerFactory.getLogger(RouterAsyncUserProtocol.class);
 
