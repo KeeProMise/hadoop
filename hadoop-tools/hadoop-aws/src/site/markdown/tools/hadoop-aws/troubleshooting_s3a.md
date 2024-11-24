@@ -29,7 +29,7 @@ Common problems working with S3 are:
 7. [Other Errors](#other)
 8. [SDK Upgrade Warnings](#upgrade_warnings)
 
-This document also includes some [best pactises](#best) to aid troubleshooting.
+This document also includes some [best practises](#best) to aid troubleshooting.
 
 
 Troubleshooting IAM Assumed Roles is covered in its
@@ -236,8 +236,61 @@ read requests are allowed, but operations which write to the bucket are denied.
 
 Check the system clock.
 
-### <a name="bad_request"></a> "Bad Request" exception when working with data stores in an AWS region other than us-eaast
 
+### `Class does not implement software.amazon.awssdk.auth.credentials.AwsCredentialsProvider`
+
+A credential provider listed in `fs.s3a.aws.credentials.provider` does not implement
+the interface `software.amazon.awssdk.auth.credentials.AwsCredentialsProvider`.
+
+```
+InstantiationIOException: `s3a://stevel-gcs/': Class org.apache.hadoop.fs.s3a.S3ARetryPolicy does not implement
+ software.amazon.awssdk.auth.credentials.AwsCredentialsProvider (configuration key fs.s3a.aws.credentials.provider)
+        at org.apache.hadoop.fs.s3a.impl.InstantiationIOException.isNotInstanceOf(InstantiationIOException.java:128)
+        at org.apache.hadoop.fs.s3a.S3AUtils.getInstanceFromReflection(S3AUtils.java:604)
+        at org.apache.hadoop.fs.s3a.auth.CredentialProviderListFactory.createAWSV2CredentialProvider(CredentialProviderListFactory.java:299)
+        at org.apache.hadoop.fs.s3a.auth.CredentialProviderListFactory.buildAWSProviderList(CredentialProviderListFactory.java:245)
+        at org.apache.hadoop.fs.s3a.auth.CredentialProviderListFactory.createAWSCredentialProviderList(CredentialProviderListFactory.java:144)
+        at org.apache.hadoop.fs.s3a.S3AFileSystem.bindAWSClient(S3AFileSystem.java:971)
+        at org.apache.hadoop.fs.s3a.S3AFileSystem.initialize(S3AFileSystem.java:624)
+        at org.apache.hadoop.fs.FileSystem.createFileSystem(FileSystem.java:3601)
+        at org.apache.hadoop.fs.FileSystem.access$300(FileSystem.java:171)
+        at org.apache.hadoop.fs.FileSystem$Cache.getInternal(FileSystem.java:3702)
+        at org.apache.hadoop.fs.FileSystem$Cache.get(FileSystem.java:3653)
+        at org.apache.hadoop.fs.FileSystem.get(FileSystem.java:555)
+        at org.apache.hadoop.fs.Path.getFileSystem(Path.java:366)
+
+```
+
+There's two main causes
+
+1. A class listed there is not an implementation of the interface.
+   Fix: review the settings and correct as appropriate.
+1. A class listed there does implement the interface, but it has been loaded in a different
+   classloader, so the JVM does not consider it to be an implementation.
+   Fix: learn the entire JVM classloader model and see if you can then debug it.
+   Tip: having both the AWS Shaded SDK and individual AWS SDK modules on your classpath
+   may be a cause of this.
+
+If you see this and you are trying to use the S3A connector with Spark, then the cause can
+be that the isolated classloader used to load Hive classes is interfering with the S3A
+connector's dynamic loading of `software.amazon.awssdk` classes. To fix this, declare that
+the classes in the aws SDK are loaded from the same classloader which instantiated
+the S3A FileSystem instance:
+
+```
+spark.sql.hive.metastore.sharedPrefixes software.amazon.awssdk.
+```
+
+
+## <a name="400_bad_request"></a> 400 Bad Request errors
+
+S3 stores return HTTP status code 400 "Bad Request" when the client make a request which
+the store considers invalid.
+
+This is most commonly caused by signing errors: secrets, region, even confusion between public and private
+S3 stores.
+
+### <a name="bad_request"></a> "Bad Request" exception when working with data stores in an AWS region other than us-east
 
 
 ```
@@ -286,50 +339,59 @@ S3 region as `ca-central-1`.
 </property>
 ```
 
-### `Classdoes not implement software.amazon.awssdk.auth.credentials.AwsCredentialsProvider`
-
-A credential provider listed in `fs.s3a.aws.credentials.provider` does not implement
-the interface `software.amazon.awssdk.auth.credentials.AwsCredentialsProvider`.
+### <a name="request_timeout"></a> 400 + RequestTimeout "Your socket connection to the server was not read from or written to within the timeout period"
 
 ```
-InstantiationIOException: `s3a://stevel-gcs/': Class org.apache.hadoop.fs.s3a.S3ARetryPolicy does not implement software.amazon.awssdk.auth.credentials.AwsCredentialsProvider (configuration key fs.s3a.aws.credentials.provider)
-        at org.apache.hadoop.fs.s3a.impl.InstantiationIOException.isNotInstanceOf(InstantiationIOException.java:128)
-        at org.apache.hadoop.fs.s3a.S3AUtils.getInstanceFromReflection(S3AUtils.java:604)
-        at org.apache.hadoop.fs.s3a.auth.CredentialProviderListFactory.createAWSV2CredentialProvider(CredentialProviderListFactory.java:299)
-        at org.apache.hadoop.fs.s3a.auth.CredentialProviderListFactory.buildAWSProviderList(CredentialProviderListFactory.java:245)
-        at org.apache.hadoop.fs.s3a.auth.CredentialProviderListFactory.createAWSCredentialProviderList(CredentialProviderListFactory.java:144)
-        at org.apache.hadoop.fs.s3a.S3AFileSystem.bindAWSClient(S3AFileSystem.java:971)
-        at org.apache.hadoop.fs.s3a.S3AFileSystem.initialize(S3AFileSystem.java:624)
-        at org.apache.hadoop.fs.FileSystem.createFileSystem(FileSystem.java:3601)
-        at org.apache.hadoop.fs.FileSystem.access$300(FileSystem.java:171)
-        at org.apache.hadoop.fs.FileSystem$Cache.getInternal(FileSystem.java:3702)
-        at org.apache.hadoop.fs.FileSystem$Cache.get(FileSystem.java:3653)
-        at org.apache.hadoop.fs.FileSystem.get(FileSystem.java:555)
-        at org.apache.hadoop.fs.Path.getFileSystem(Path.java:366)
-
+org.apache.hadoop.fs.s3a.AWSBadRequestException: upload part #1 upload ID 1122334455:
+  software.amazon.awssdk.services.s3.model.S3Exception:
+  Your socket connection to the server was not read from or written to within the timeout period.
+  Idle connections will be closed.
+  (Service: S3, Status Code: 400, Request ID: 1122334455, Extended Request ID: ...):
+  RequestTimeout:
+   Your socket connection to the server was not read from or written to within the timeout period.
+   Idle connections will be closed. (Service: S3, Status Code: 400, Request ID: 1122334455, Extended Request ID: ...
 ```
 
-There's two main causes
+This is an obscure failure which was encountered as part of
+[HADOOP-19221](https://issues.apache.org/jira/browse/HADOOP-19221) : an upload of part of a file could not
+be succesfully retried after a failure was reported on the first attempt.
 
-1. A class listed there is not an implementation of the interface.
-   Fix: review the settings and correct as appropriate.
-1. A class listed there does implement the interface, but it has been loaded in a different
-   classloader, so the JVM does not consider it to be an implementation.
-   Fix: learn the entire JVM classloader model and see if you can then debug it.
-   Tip: having both the AWS Shaded SDK and individual AWS SDK modules on your classpath
-   may be a cause of this.
+1. It was only encountered during uploading files via the Staging Committers
+2. And is a regression in the V2 SDK.
+3. This should have been addressed in the S3A connector.
 
-If you see this and you are trying to use the S3A connector with Spark, then the cause can
-be that the isolated classloader used to load Hive classes is interfering with the S3A
-connector's dynamic loading of `software.amazon.awssdk` classes. To fix this, declare that
-the classes in the aws SDK are loaded from the same classloader which instantiated
-the S3A FileSystem instance:
+* If it is encountered on a hadoop release with HADOOP-19221, then this is a regression -please report it.
+* If it is encountered on a release without the fix, please upgrade.
+
+It may be that the problem arises in the AWS SDK's "TransferManager", which is used for a
+higher performance upload of data from the local fileystem. If this is the case. disable this feature:
+```
+<property>
+  <name>fs.s3a.optimized.copy.from.local.enabled</name>
+  <value>false</value>
+</property>
+```
+
+### Status Code 400 "One or more of the specified parts could not be found"
 
 ```
-spark.sql.hive.metastore.sharedPrefixes software.amazon.awssdk.
+org.apache.hadoop.fs.s3a.AWSBadRequestException: Completing multipart upload on job-00-fork-0003/test/testTwoPartUpload:
+software.amazon.awssdk.services.s3.model.S3Exception: One or more of the specified parts could not be found.
+The part may not have been uploaded, or the specified entity tag may not match the part's entity tag.
+(Service: S3, Status Code: 400, Request ID: EKNW2V7P34T7YK9E,
+ Extended Request ID: j64Dfdmfd2ZnjErbX1c05YmidLGx/5pJF9Io4B0w8Cx3aDTSFn1pW007BuzyxPeAbph/ZqXHjbU=):InvalidPart:
 ```
 
-## <a name="access_denied"></a> "The security token included in the request is invalid"
+Happens if a multipart upload is being completed, but one of the parts is missing.
+* An upload took so long that the part was deleted by the store
+* A magic committer job's list of in-progress uploads somehow got corrupted
+* Bug in the S3A codebase (rare, but not impossible...)
+
+## <a name="access_denied"></a> Access Denied
+
+HTTP error codes 401 and 403 are mapped to `AccessDeniedException` in the S3A connector.
+
+### "The security token included in the request is invalid"
 
 You are trying to use session/temporary credentials and the session token
 supplied is considered invalid.
@@ -501,7 +563,53 @@ endpoint and region like the following:
   <value>${sts.region}</value>
 </property>
 ```
+## <a name="500_internal_error"></a> HTTP 500 status code "We encountered an internal error"
 
+```
+We encountered an internal error. Please try again.
+(Service: S3, Status Code: 500, Request ID: <id>, Extended Request ID: <extended-id>)
+```
+
+The [status code 500](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500) indicates
+the S3 store has reported an internal problem.
+When raised by Amazon S3, this is a rare sign of a problem within the S3 system
+or another part of the cloud infrastructure on which it depends.
+Retrying _should_ make it go away.
+
+The 500 error is considered retryable by the AWS SDK, which will have already
+tried it `fs.s3a.attempts.maximum` times before reaching the S3A client -which
+will also retry.
+
+The S3A client will attempt to retry on a 500 (or other 5xx error other than 501/503)
+if the option `fs.s3a.retry.http.5xx.errors` is set to `true`.
+This is the default.
+```xml
+<property>
+  <name>fs.s3a.retry.http.5xx.errors</name>
+  <value>true</value>
+</property>
+```
+
+If encountered against a third party store (the lack of an extended request ID always implies this),
+then it may be a permanent server-side failure.
+
+* All HTTP status codes other than 503 (service unavailable) and 501 (unsupported) are
+treated as 500 exceptions.
+* The S3A Filesystem IOStatistics counts the number of 500 errors received.
+
+## <a name="503 Throttling"></a> HTTP 503 status code "slow down" or 429 "Too Many Requests"
+
+The [status code 503](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/503)
+is returned by AWS S3 when the IO rate limit of the bucket is reached.
+
+Google's cloud storage returns the response [429 Too Many Requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/429)
+for the same situation.
+
+The AWS S3 documentation [covers this and suggests mitigation strategies](https://repost.aws/knowledge-center/http-5xx-errors-s3).
+Note that it can also be caused by throttling in the KMS bencryption subsystem if
+SSE-KMS or DSSE-KMS is used to encrypt data.
+
+Consult [performance - throttling](./performance.html#throttling) for details on throttling.
 
 ## <a name="connectivity"></a> Connectivity Problems
 
@@ -943,15 +1051,25 @@ file using configured SSE-C keyB into that structure.
 
 ## <a name="client-side-encryption"></a> S3 Client Side Encryption
 
+### java.lang.NoClassDefFoundError: software/amazon/encryption/s3/S3EncryptionClient
+
+With the move to the V2 AWS SDK, CSE is implemented via
+[amazon-s3-encryption-client-java](https://github.com/aws/amazon-s3-encryption-client-java/tree/v3.1.1)
+which is not packaged in AWS SDK V2 bundle jar and needs to be added separately.
+
+Fix: add amazon-s3-encryption-client-java jar version 3.1.1  to the class path.
+
 ### Instruction file not found for S3 object
 
-Reading an unencrypted file would fail when read through CSE enabled client.
+Reading an unencrypted file would fail when read through CSE enabled client by default.
 ```
-java.lang.SecurityException: Instruction file not found for S3 object with bucket name: ap-south-cse, key: unencryptedData.txt
-
+software.amazon.encryption.s3.S3EncryptionClientException: Instruction file not found!
+Please ensure the object you are attempting to decrypt has been encrypted
+using the S3 Encryption Client.
 ```
 CSE enabled client should read encrypted data only.
 
+Fix: set `fs.s3a.encryption.cse.v1.compatibility.enabled=true`
 ### CSE-KMS method requires KMS key ID
 
 KMS key ID is required for CSE-KMS to encrypt data, not providing one leads
@@ -999,49 +1117,8 @@ Key 'arn:aws:kms:ap-south-1:152813717728:key/<KMS_KEY_ID>'
 does not exist(Service: AWSKMS; Status Code: 400; Error Code: NotFoundException;
 Request ID: 279db85d-864d-4a38-9acd-d892adb504c0; Proxy: null)
 ```
-While generating the KMS Key ID make sure to generate it in the same region
- as your bucket.
-
-### Unable to perform range get request: Range get support has been disabled
-
-If Range get is not supported for a CSE algorithm or is disabled:
-```
-java.lang.SecurityException: Unable to perform range get request: Range get support has been disabled. See https://docs.aws.amazon.com/general/latest/gr/aws_sdk_cryptography.html
-
-```
-Range gets must be enabled for CSE to work.
-
-### WARNING: Range gets do not provide authenticated encryption properties even when used with an authenticated mode (AES-GCM).
-
-The S3 Encryption Client is configured to support range get requests. This
- warning would be shown everytime S3-CSE is used.
-```
-2021-07-14 12:54:09,525 [main] WARN  s3.AmazonS3EncryptionClientV2
-(AmazonS3EncryptionClientV2.java:warnOnRangeGetsEnabled(401)) - The S3
-Encryption Client is configured to support range get requests. Range gets do
-not provide authenticated encryption properties even when used with an
-authenticated mode (AES-GCM). See https://docs.aws.amazon.com/general/latest
-/gr/aws_sdk_cryptography.html
-```
-We can Ignore this warning since, range gets must be enabled for S3-CSE to
-get data.
-
-### WARNING: If you don't have objects encrypted with these legacy modes, you should disable support for them to enhance security.
-
-The S3 Encryption Client is configured to read encrypted data with legacy
-encryption modes through the CryptoMode setting, and we would see this
-warning for all S3-CSE request.
-
-```
-2021-07-14 12:54:09,519 [main] WARN  s3.AmazonS3EncryptionClientV2
-(AmazonS3EncryptionClientV2.java:warnOnLegacyCryptoMode(409)) - The S3
-Encryption Client is configured to read encrypted data with legacy
-encryption modes through the CryptoMode setting. If you don't have objects
-encrypted with these legacy modes, you should disable support for them to
-enhance security. See https://docs.aws.amazon.com/general/latest/gr/aws_sdk_cryptography.html
-```
-We can ignore this, since this CryptoMode setting(CryptoMode.AuthenticatedEncryption)
-is required for range gets to work.
+If S3 bucket region is different from the KMS key region,
+set`fs.s3a.encryption.cse.kms.region=<KMS_REGION>`
 
 ### `software.amazon.awssdk.services.kms.mode.InvalidKeyUsageException: You cannot generate a data key with an asymmetric CMK`
 
