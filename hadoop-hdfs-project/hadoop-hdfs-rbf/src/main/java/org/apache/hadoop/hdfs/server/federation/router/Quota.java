@@ -252,6 +252,7 @@ public class Quota {
    * @param path Federation path of the results.
    * @param results Quota query result.
    * @return Aggregated Quota.
+   * @throws IOException If the quota system is disabled.
    */
   protected QuotaUsage aggregateQuota(String path,
       Map<RemoteLocation, QuotaUsage> results) throws IOException {

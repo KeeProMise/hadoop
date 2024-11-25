@@ -93,6 +93,8 @@ public class RouterStateIdContext implements AlignmentContext {
 
   /**
    * Adds the {@link #namespaceIdMap} to the response header that will be sent to a client.
+   *
+   * @param headerBuilder the response header that will be sent to a client.
    */
   public void setResponseHeaderState(RpcResponseHeaderProto.Builder headerBuilder) {
     if (namespaceIdMap.isEmpty()) {
@@ -128,6 +130,9 @@ public class RouterStateIdContext implements AlignmentContext {
 
   /**
    * Utility function to parse routerFederatedState field in RPC headers.
+   *
+   * @param byteString the byte string of routerFederatedState.
+   * @return the router federated state map.
    */
   public static Map<String, Long> getRouterFederatedStateMap(ByteString byteString) {
     if (byteString != null) {

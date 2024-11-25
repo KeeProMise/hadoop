@@ -2228,7 +2228,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
    * mount entry.
    * @param path The path on which the operation need to be invoked.
    * @return true if the call is supposed to invoked on all locations.
-   * @throws IOException
+   * @throws IOException If an I/O error occurs.
    */
   public boolean isInvokeConcurrent(final String path) throws IOException {
     if (subclusterResolver instanceof MountTableResolver) {
