@@ -17,6 +17,11 @@
  */
 package org.apache.hadoop.hdfs.server.federation.router.async;
 
+import org.apache.hadoop.hdfs.server.federation.router.async.utils.Async;
+import org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncApplyFunction;
+import org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncCatchFunction;
+import org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil;
+import org.apache.hadoop.hdfs.server.federation.router.async.utils.FinallyFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,15 +33,15 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.function.Function;
 
-import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncApply;
-import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncCatch;
-import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncComplete;
-import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncCurrent;
-import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncFinally;
-import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncForEach;
-import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncReturn;
-import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncThrowException;
-import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncTry;
+import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.asyncApply;
+import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.asyncCatch;
+import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.asyncComplete;
+import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.asyncCurrent;
+import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.asyncFinally;
+import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.asyncForEach;
+import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.asyncReturn;
+import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.asyncThrowException;
+import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.asyncTry;
 
 /**
  * AsyncClass demonstrates the conversion of synchronous methods

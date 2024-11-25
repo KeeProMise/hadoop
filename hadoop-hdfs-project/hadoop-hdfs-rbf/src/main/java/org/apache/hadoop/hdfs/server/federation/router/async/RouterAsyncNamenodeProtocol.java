@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdfs.server.federation.async;
+package org.apache.hadoop.hdfs.server.federation.router.async;
 
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
@@ -25,7 +25,7 @@ import org.apache.hadoop.hdfs.server.federation.router.RemoteMethod;
 import org.apache.hadoop.hdfs.server.federation.router.RouterNamenodeProtocol;
 import org.apache.hadoop.hdfs.server.federation.router.RouterRpcClient;
 import org.apache.hadoop.hdfs.server.federation.router.RouterRpcServer;
-import org.apache.hadoop.hdfs.server.federation.router.async.AsyncApplyFunction;
+import org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncApplyFunction;
 import org.apache.hadoop.hdfs.server.namenode.NNStorage;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations;
@@ -35,9 +35,9 @@ import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
 import java.io.IOException;
 import java.util.Map;
 
-import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncApply;
-import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncComplete;
-import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncReturn;
+import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.asyncApply;
+import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.asyncComplete;
+import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.asyncReturn;
 
 /**
  * Module that implements all the asynchronous RPC calls in {@link NamenodeProtocol} in the

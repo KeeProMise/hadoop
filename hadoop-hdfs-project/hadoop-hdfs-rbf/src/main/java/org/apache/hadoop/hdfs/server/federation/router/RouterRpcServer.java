@@ -37,12 +37,12 @@ import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DN_R
 import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_FEDERATION_RENAME_OPTION;
 import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_FEDERATION_RENAME_OPTION_DEFAULT;
 import static org.apache.hadoop.hdfs.server.federation.router.RouterFederationRename.RouterRenameOption;
-import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncApply;
-import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncCatch;
-import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncComplete;
-import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncForEach;
-import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncReturn;
-import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncTry;
+import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.asyncApply;
+import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.asyncCatch;
+import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.asyncComplete;
+import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.asyncForEach;
+import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.asyncReturn;
+import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.asyncTry;
 import static org.apache.hadoop.tools.fedbalance.FedBalanceConfigs.SCHEDULER_JOURNAL_URI;
 
 import java.io.FileNotFoundException;
@@ -75,9 +75,10 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.HAUtil;
 import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
 import org.apache.hadoop.hdfs.protocolPB.AsyncRpcProtocolPBUtil;
-import org.apache.hadoop.hdfs.server.federation.router.async.ApplyFunction;
-import org.apache.hadoop.hdfs.server.federation.router.async.AsyncCatchFunction;
-import org.apache.hadoop.hdfs.server.federation.router.async.CatchFunction;
+import org.apache.hadoop.hdfs.server.federation.router.async.RouterAsyncRpcClient;
+import org.apache.hadoop.hdfs.server.federation.router.async.utils.ApplyFunction;
+import org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncCatchFunction;
+import org.apache.hadoop.hdfs.server.federation.router.async.utils.CatchFunction;
 import org.apache.hadoop.thirdparty.com.google.common.cache.CacheBuilder;
 import org.apache.hadoop.thirdparty.com.google.common.cache.CacheLoader;
 import org.apache.hadoop.thirdparty.com.google.common.cache.LoadingCache;
@@ -686,7 +687,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
    *                           client requests.
    * @throws UnsupportedOperationException If the operation is not supported.
    */
-  void checkOperation(OperationCategory op, boolean supported)
+  public void checkOperation(OperationCategory op, boolean supported)
       throws StandbyException, UnsupportedOperationException {
     checkOperation(op);
 
@@ -2010,7 +2011,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
    * @return Prioritized list of locations in the federated cluster.
    * @throws IOException If the location for this path cannot be determined.
    */
-  protected List<RemoteLocation> getLocationsForPath(String path,
+  public List<RemoteLocation> getLocationsForPath(String path,
       boolean failIfLocked, boolean needQuotaVerify) throws IOException {
     try {
       if (failIfLocked) {
@@ -2229,7 +2230,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
    * @return true if the call is supposed to invoked on all locations.
    * @throws IOException
    */
-  boolean isInvokeConcurrent(final String path) throws IOException {
+  public boolean isInvokeConcurrent(final String path) throws IOException {
     if (subclusterResolver instanceof MountTableResolver) {
       MountTableResolver mountTableResolver =
           (MountTableResolver) subclusterResolver;

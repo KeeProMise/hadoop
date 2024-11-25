@@ -15,12 +15,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdfs.server.federation.router.async;
+package org.apache.hadoop.hdfs.server.federation.router.async.utils;
 
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 
-import static org.apache.hadoop.hdfs.server.federation.router.async.Async.warpCompletionException;
+import static org.apache.hadoop.hdfs.server.federation.router.async.utils.Async.warpCompletionException;
 
 /**
  * The {@code FinallyFunction} interface represents a function that is used to perform

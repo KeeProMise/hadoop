@@ -15,10 +15,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdfs.server.federation.router;
+package org.apache.hadoop.hdfs.server.federation.router.async;
 
 import org.apache.hadoop.fs.QuotaUsage;
 import org.apache.hadoop.hdfs.server.federation.resolver.RemoteLocation;
+import org.apache.hadoop.hdfs.server.federation.router.Quota;
+import org.apache.hadoop.hdfs.server.federation.router.RemoteMethod;
+import org.apache.hadoop.hdfs.server.federation.router.RemoteParam;
+import org.apache.hadoop.hdfs.server.federation.router.Router;
+import org.apache.hadoop.hdfs.server.federation.router.RouterRpcClient;
+import org.apache.hadoop.hdfs.server.federation.router.RouterRpcServer;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 
 import java.io.IOException;
@@ -26,8 +32,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionException;
 
-import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncApply;
-import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.asyncReturn;
+import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.asyncApply;
+import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.asyncReturn;
 
 public class AsyncQuota extends Quota {
 
@@ -50,6 +56,7 @@ public class AsyncQuota extends Quota {
    * @return Aggregated quota.
    * @throws IOException If the quota system is disabled.
    */
+  @Override
   public QuotaUsage getQuotaUsage(String path) throws IOException {
     getEachQuotaUsage(path);
 
@@ -70,7 +77,8 @@ public class AsyncQuota extends Quota {
    * @return quota usage for each remote location.
    * @throws IOException If the quota system is disabled.
    */
-  Map<RemoteLocation, QuotaUsage> getEachQuotaUsage(String path)
+  @Override
+  protected Map<RemoteLocation, QuotaUsage> getEachQuotaUsage(String path)
       throws IOException {
     rpcServer.checkOperation(NameNode.OperationCategory.READ);
     if (!router.isQuotaEnabled()) {

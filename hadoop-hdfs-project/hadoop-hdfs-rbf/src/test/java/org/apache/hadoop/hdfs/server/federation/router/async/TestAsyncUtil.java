@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.federation.router.async;
 
+import org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil;
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.apache.hadoop.util.Time;
 import org.junit.After;

@@ -21,10 +21,6 @@
  * Distributed File System (HDFS) Federation router. These classes are designed to work with
  * the Hadoop ecosystem, providing utilities and interfaces to perform non-blocking tasks that
  * can improve the performance and responsiveness of HDFS operations.
- *
- * <p>These classes work together to enable complex asynchronous workflows, making it easier to
- * write code that can handle long-running tasks without blocking, thus improving the overall
- * efficiency and scalability of HDFS operations.</p>
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving

@@ -15,13 +15,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdfs.server.federation.router.async;
+package org.apache.hadoop.hdfs.server.federation.router.async.utils;
 
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 
-import static org.apache.hadoop.hdfs.server.federation.router.async.Async.unWarpCompletionException;
-import static org.apache.hadoop.hdfs.server.federation.router.async.Async.warpCompletionException;
+import static org.apache.hadoop.hdfs.server.federation.router.async.utils.Async.unWarpCompletionException;
+import static org.apache.hadoop.hdfs.server.federation.router.async.utils.Async.warpCompletionException;
 
 /**
  * The {@code CatchFunction} interface represents a function that handles exceptions
@@ -58,7 +58,7 @@ import static org.apache.hadoop.hdfs.server.federation.router.async.Async.warpCo
  */
 @FunctionalInterface
 public interface CatchFunction<R, E extends Throwable>
-    extends Async<R>{
+    extends Async<R> {
 
   /**
    * Applies this catch function to the given result and exception.

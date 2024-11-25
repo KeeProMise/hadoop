@@ -48,7 +48,7 @@ import org.apache.hadoop.thirdparty.protobuf.InvalidProtocolBufferException;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-class RouterStateIdContext implements AlignmentContext {
+public class RouterStateIdContext implements AlignmentContext {
 
   private final HashSet<String> coordinatedMethods;
   /**
@@ -110,7 +110,8 @@ class RouterStateIdContext implements AlignmentContext {
   }
 
   public LongAccumulator getNamespaceStateId(String nsId) {
-    return namespaceIdMap.computeIfAbsent(nsId, key -> new LongAccumulator(Math::max, Long.MIN_VALUE));
+    return namespaceIdMap.computeIfAbsent(nsId,
+        key -> new LongAccumulator(Math::max, Long.MIN_VALUE));
   }
 
   public List<String> getNamespaces() {
@@ -148,7 +149,8 @@ class RouterStateIdContext implements AlignmentContext {
     if (call != null) {
       ByteString callFederatedNamespaceState = call.getFederatedNamespaceState();
       if (callFederatedNamespaceState != null) {
-        Map<String, Long> clientFederatedStateIds = getRouterFederatedStateMap(callFederatedNamespaceState);
+        Map<String, Long> clientFederatedStateIds =
+            getRouterFederatedStateMap(callFederatedNamespaceState);
         clientStateID = clientFederatedStateIds.getOrDefault(nsId, Long.MIN_VALUE);
       }
     }

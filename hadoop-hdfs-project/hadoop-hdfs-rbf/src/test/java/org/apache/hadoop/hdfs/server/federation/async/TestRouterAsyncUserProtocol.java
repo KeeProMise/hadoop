@@ -17,11 +17,12 @@
  */
 package org.apache.hadoop.hdfs.server.federation.async;
 
+import org.apache.hadoop.hdfs.server.federation.router.async.RouterAsyncUserProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Before;
 import org.junit.Test;
 
-import static org.apache.hadoop.hdfs.server.federation.router.async.AsyncUtil.syncReturn;
+import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.syncReturn;
 import static org.junit.Assert.assertArrayEquals;
 
 /**
