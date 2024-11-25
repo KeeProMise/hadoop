@@ -31,6 +31,11 @@ import java.util.List;
 
 import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.asyncReturn;
 
+/**
+ * Module that implements all the asynchronous RPC calls in
+ * {@link org.apache.hadoop.hdfs.protocol.ClientProtocol} related to
+ * Storage Policy in the {@link RouterRpcServer}.
+ */
 public class RouterAsyncStoragePolicy extends RouterStoragePolicy {
   /** RPC server to receive client calls. */
   private final RouterRpcServer rpcServer;
@@ -43,6 +48,15 @@ public class RouterAsyncStoragePolicy extends RouterStoragePolicy {
     this.rpcClient = this.rpcServer.getRPCClient();
   }
 
+  /**
+   * Asynchronously get the storage policy for a given path.
+   * This method checks the operation category and then invokes the
+   * getStoragePolicy method sequentially for the given path.
+   *
+   * @param path The path for which to retrieve the storage policy.
+   * @return The BlockStoragePolicy for the given path.
+   * @throws IOException If an I/O error occurs.
+   */
   @Override
   public BlockStoragePolicy getStoragePolicy(String path)
       throws IOException {
@@ -57,6 +71,14 @@ public class RouterAsyncStoragePolicy extends RouterStoragePolicy {
     return asyncReturn(BlockStoragePolicy.class);
   }
 
+  /**
+   * Asynchronously get an array of all available storage policies.
+   * This method checks the operation category and then invokes the
+   * getStoragePolicies method across all available namespaces.
+   *
+   * @return An array of BlockStoragePolicy.
+   * @throws IOException If an I/O error occurs.
+   */
   @Override
   public BlockStoragePolicy[] getStoragePolicies() throws IOException {
     rpcServer.checkOperation(NameNode.OperationCategory.READ);

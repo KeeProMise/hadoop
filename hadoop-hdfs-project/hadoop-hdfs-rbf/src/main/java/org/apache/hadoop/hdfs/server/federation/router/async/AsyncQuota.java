@@ -35,6 +35,12 @@ import java.util.concurrent.CompletionException;
 import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.asyncApply;
 import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.asyncReturn;
 
+/**
+ * Provides asynchronous operations for managing quotas in HDFS Federation.
+ * This class extends {@link org.apache.hadoop.hdfs.server.federation.router.Quota}
+ * and overrides its methods to perform quota operations in a non-blocking manner,
+ * allowing for concurrent execution and improved performance.
+ */
 public class AsyncQuota extends Quota {
 
   /** RPC server to receive client calls. */

@@ -67,6 +67,7 @@ public class RouterAsyncUserProtocol extends RouterUserProtocol {
 
   /**
    * Asynchronously refresh user to group mappings.
+   *
    * @throws IOException  raised on errors performing I/O.
    */
   @Override
@@ -86,6 +87,7 @@ public class RouterAsyncUserProtocol extends RouterUserProtocol {
 
   /**
    * Asynchronously refresh superuser proxy group list.
+   *
    * @throws IOException  raised on errors performing I/O.
    */
   @Override
@@ -105,6 +107,7 @@ public class RouterAsyncUserProtocol extends RouterUserProtocol {
 
   /**
    * Asynchronously get the groups which are mapped to the given user.
+   *
    * @param user The user to get the groups for.
    * @return The set of groups the user belongs to.
    * @throws IOException raised on errors performing I/O.

@@ -63,6 +63,16 @@ public class RouterAsyncSnapshot extends RouterSnapshot {
     this.namenodeResolver = rpcServer.getNamenodeResolver();
   }
 
+  /**
+   * Asynchronously creates a snapshot with the given root and name.
+   * This method checks the operation category and then invokes the createSnapshot
+   * method concurrently across all namespaces, returning the first successful response.
+   *
+   * @param snapshotRoot The root path of the snapshot.
+   * @param snapshotName The name of the snapshot.
+   * @return The path of the created snapshot.
+   * @throws IOException If an I/O error occurs.
+   */
   @Override
   public String createSnapshot(String snapshotRoot, String snapshotName) throws IOException {
     rpcServer.checkOperation(NameNode.OperationCategory.WRITE);
@@ -95,6 +105,15 @@ public class RouterAsyncSnapshot extends RouterSnapshot {
     return asyncReturn(String.class);
   }
 
+  /**
+   * Asynchronously get an array of snapshottable directory listings.
+   * This method checks the operation category and then invokes the
+   * getSnapshottableDirListing method concurrently across all namespaces, merging
+   * the results into a single array.
+   *
+   * @return Array of SnapshottableDirectoryStatus.
+   * @throws IOException If an I/O error occurs.
+   */
   @Override
   public SnapshottableDirectoryStatus[] getSnapshottableDirListing() throws IOException {
     rpcServer.checkOperation(NameNode.OperationCategory.READ);
@@ -109,6 +128,16 @@ public class RouterAsyncSnapshot extends RouterSnapshot {
     return asyncReturn(SnapshottableDirectoryStatus[].class);
   }
 
+  /**
+   * Asynchronously get an array of snapshot listings for the given snapshot root.
+   * This method checks the operation category and then invokes the
+   * getSnapshotListing method, either sequentially or concurrently based on the
+   * configuration, and returns the merged results.
+   *
+   * @param snapshotRoot The root path of the snapshots.
+   * @return Array of SnapshotStatus.
+   * @throws IOException If an I/O error occurs.
+   */
   @Override
   public SnapshotStatus[] getSnapshotListing(String snapshotRoot) throws IOException {
     rpcServer.checkOperation(NameNode.OperationCategory.READ);
@@ -151,6 +180,18 @@ public class RouterAsyncSnapshot extends RouterSnapshot {
     return asyncReturn(SnapshotStatus[].class);
   }
 
+  /**
+   * Asynchronously get a snapshot diff report for the given root and snapshot names.
+   * This method checks the operation category and then invokes the
+   * getSnapshotDiffReport method, either sequentially or concurrently based on the
+   * configuration, and returns the result.
+   *
+   * @param snapshotRoot The root path of the snapshot.
+   * @param earlierSnapshotName The name of the earlier snapshot.
+   * @param laterSnapshotName The name of the later snapshot.
+   * @return SnapshotDiffReport for the snapshots.
+   * @throws IOException If an I/O error occurs.
+   */
   @Override
   public SnapshotDiffReport getSnapshotDiffReport(
       String snapshotRoot, String earlierSnapshotName,
@@ -175,6 +216,20 @@ public class RouterAsyncSnapshot extends RouterSnapshot {
     }
   }
 
+  /**
+   * Asynchronously get a snapshot diff report listing for the given root and snapshot names.
+   * This method checks the operation category and then invokes the
+   * getSnapshotDiffReportListing method, either sequentially or concurrently based
+   * on the configuration, and returns the result.
+   *
+   * @param snapshotRoot The root path of the snapshot.
+   * @param earlierSnapshotName The name of the earlier snapshot.
+   * @param laterSnapshotName The name of the later snapshot.
+   * @param startPath The starting path for the diff report.
+   * @param index The index for the diff report listing.
+   * @return SnapshotDiffReportListing for the snapshots.
+   * @throws IOException If an I/O error occurs.
+   */
   @Override
   public SnapshotDiffReportListing getSnapshotDiffReportListing(
       String snapshotRoot, String earlierSnapshotName, String laterSnapshotName,

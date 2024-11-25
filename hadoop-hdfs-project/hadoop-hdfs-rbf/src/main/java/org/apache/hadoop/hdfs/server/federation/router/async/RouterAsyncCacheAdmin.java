@@ -47,6 +47,17 @@ public class RouterAsyncCacheAdmin extends RouterCacheAdmin {
     super(server);
   }
 
+  /**
+   * Asynchronously adds a new cache directive with the given path and flags.
+   * This method invokes the addCacheDirective method concurrently across all
+   * namespaces, and returns the first response as a long value representing the
+   * directive ID.
+   *
+   * @param path The cache directive path.
+   * @param flags The cache flags.
+   * @return The ID of the newly added cache directive.
+   * @throws IOException If an I/O error occurs.
+   */
   @Override
   public long addCacheDirective(
       CacheDirectiveInfo path, EnumSet<CacheFlag> flags) throws IOException {
@@ -56,6 +67,17 @@ public class RouterAsyncCacheAdmin extends RouterCacheAdmin {
     return asyncReturn(Long.class);
   }
 
+  /**
+   * Asynchronously lists cache directives based on the provided previous ID and filter.
+   * This method invokes the listCacheDirectives method concurrently across all
+   * namespaces, and returns the first response as a BatchedEntries object containing
+   * the cache directive entries.
+   *
+   * @param prevId The previous ID from which to start listing.
+   * @param filter The filter to apply to the cache directives.
+   * @return BatchedEntries of cache directive entries.
+   * @throws IOException If an I/O error occurs.
+   */
   @Override
   public BatchedEntries<CacheDirectiveEntry> listCacheDirectives(
       long prevId, CacheDirectiveInfo filter) throws IOException {
@@ -66,6 +88,16 @@ public class RouterAsyncCacheAdmin extends RouterCacheAdmin {
     return asyncReturn(BatchedEntries.class);
   }
 
+  /**
+   * Asynchronously lists cache pools starting from the provided key.
+   * This method invokes the listCachePools method concurrently across all namespaces,
+   * and returns the first response as a BatchedEntries object containing the cache
+   * pool entries.
+   *
+   * @param prevKey The previous key from which to start listing.
+   * @return BatchedEntries of cache pool entries.
+   * @throws IOException If an I/O error occurs.
+   */
   @Override
   public BatchedEntries<CachePoolEntry> listCachePools(String prevKey) throws IOException {
     invokeListCachePools(prevKey);

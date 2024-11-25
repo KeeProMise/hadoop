@@ -44,6 +44,12 @@ import static org.apache.hadoop.hdfs.server.federation.router.RouterRpcServer.me
 import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.asyncApply;
 import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.asyncReturn;
 
+/**
+ * Provides asynchronous operations for erasure coding in HDFS Federation.
+ * This class extends {@link org.apache.hadoop.hdfs.server.federation.router.ErasureCoding}
+ * and overrides its methods to perform erasure coding operations in a non-blocking manner,
+ * allowing for concurrent execution and improved performance.
+ */
 public class AsyncErasureCoding extends ErasureCoding {
   /** RPC server to receive client calls. */
   private final RouterRpcServer rpcServer;
@@ -59,6 +65,16 @@ public class AsyncErasureCoding extends ErasureCoding {
     this.namenodeResolver = this.rpcClient.getNamenodeResolver();
   }
 
+  /**
+   * Asynchronously get an array of all erasure coding policies.
+   * This method checks the operation category and then invokes the
+   * getErasureCodingPolicies method concurrently across all namespaces.
+   * <p>
+   * The results are merged and returned as an array of ErasureCodingPolicyInfo.
+   *
+   * @return Array of ErasureCodingPolicyInfo.
+   * @throws IOException If an I/O error occurs.
+   */
   @Override
   public ErasureCodingPolicyInfo[] getErasureCodingPolicies()
       throws IOException {
@@ -76,6 +92,16 @@ public class AsyncErasureCoding extends ErasureCoding {
     return asyncReturn(ErasureCodingPolicyInfo[].class);
   }
 
+  /**
+   * Asynchronously get the erasure coding codecs available.
+   * This method checks the operation category and then invokes the
+   * getErasureCodingCodecs method concurrently across all namespaces.
+   * <p>
+   * The results are merged into a single map of codec names to codec properties.
+   *
+   * @return Map of erasure coding codecs.
+   * @throws IOException If an I/O error occurs.
+   */
   @Override
   public Map<String, String> getErasureCodingCodecs() throws IOException {
     rpcServer.checkOperation(NameNode.OperationCategory.READ);
@@ -103,6 +129,17 @@ public class AsyncErasureCoding extends ErasureCoding {
     return asyncReturn(Map.class);
   }
 
+  /**
+   * Asynchronously add an array of erasure coding policies.
+   * This method checks the operation category and then invokes the
+   * addErasureCodingPolicies method concurrently across all namespaces.
+   * <p>
+   * The results are merged and returned as an array of AddErasureCodingPolicyResponse.
+   *
+   * @param policies Array of erasure coding policies to add.
+   * @return Array of AddErasureCodingPolicyResponse.
+   * @throws IOException If an I/O error occurs.
+   */
   @Override
   public AddErasureCodingPolicyResponse[] addErasureCodingPolicies(
       ErasureCodingPolicy[] policies) throws IOException {
@@ -123,6 +160,17 @@ public class AsyncErasureCoding extends ErasureCoding {
     return asyncReturn(AddErasureCodingPolicyResponse[].class);
   }
 
+  /**
+   * Asynchronously get the erasure coding policy for a given source path.
+   * This method checks the operation category and then invokes the
+   * getErasureCodingPolicy method sequentially for the given path.
+   * <p>
+   * The result is returned as an ErasureCodingPolicy object.
+   *
+   * @param src Source path to get the erasure coding policy for.
+   * @return ErasureCodingPolicy for the given path.
+   * @throws IOException If an I/O error occurs.
+   */
   @Override
   public ErasureCodingPolicy getErasureCodingPolicy(String src)
       throws IOException {
@@ -142,6 +190,17 @@ public class AsyncErasureCoding extends ErasureCoding {
     return asyncReturn(ErasureCodingPolicy.class);
   }
 
+  /**
+   * Asynchronously get the EC topology result for the given policies.
+   * This method checks the operation category and then invokes the
+   * getECTopologyResultForPolicies method concurrently across all namespaces.
+   * <p>
+   * The results are merged and the first unsupported result is returned.
+   *
+   * @param policyNames Array of policy names to check.
+   * @return ECTopologyVerifierResult for the policies.
+   * @throws IOException If an I/O error occurs.
+   */
   @Override
   public ECTopologyVerifierResult getECTopologyResultForPolicies(
       String[] policyNames) throws IOException {
@@ -168,6 +227,16 @@ public class AsyncErasureCoding extends ErasureCoding {
     return asyncReturn(ECTopologyVerifierResult.class);
   }
 
+  /**
+   * Asynchronously get the erasure coding block group statistics.
+   * This method checks the operation category and then invokes the
+   * getECBlockGroupStats method concurrently across all namespaces.
+   * <p>
+   * The results are merged and returned as an ECBlockGroupStats object.
+   *
+   * @return ECBlockGroupStats for the erasure coding block groups.
+   * @throws IOException If an I/O error occurs.
+   */
   @Override
   public ECBlockGroupStats getECBlockGroupStats() throws IOException {
     rpcServer.checkOperation(NameNode.OperationCategory.READ);
