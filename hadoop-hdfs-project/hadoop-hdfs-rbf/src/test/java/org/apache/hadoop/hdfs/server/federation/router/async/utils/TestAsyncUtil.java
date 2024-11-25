@@ -15,9 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdfs.server.federation.router.async;
+package org.apache.hadoop.hdfs.server.federation.router.async.utils;
 
-import org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil;
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.apache.hadoop.util.Time;
 import org.junit.After;

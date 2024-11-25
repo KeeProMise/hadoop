@@ -15,49 +15,41 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdfs.server.federation.router;
-
+package org.apache.hadoop.hdfs.server.federation.router.async;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.QuotaUsage;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.hdfs.StripedFileTestUtil;
-import org.apache.hadoop.hdfs.protocol.AddErasureCodingPolicyResponse;
-import org.apache.hadoop.hdfs.protocol.ECTopologyVerifierResult;
-import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicy;
-import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicyInfo;
-import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster;
 import org.apache.hadoop.hdfs.server.federation.MockResolver;
 import org.apache.hadoop.hdfs.server.federation.RouterConfigBuilder;
-import org.apache.hadoop.hdfs.server.federation.router.async.AsyncErasureCoding;
-import org.apache.hadoop.hdfs.server.federation.router.async.RouterAsyncRpcClient;
-import org.apache.hadoop.io.erasurecode.ECSchema;
+import org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys;
+import org.apache.hadoop.hdfs.server.federation.router.RouterRpcServer;
 import org.apache.hadoop.ipc.CallerContext;
 import org.junit.After;
 import org.junit.AfterClass;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_QUOTA_BY_STORAGETYPE_ENABLED_KEY;
 import static org.apache.hadoop.hdfs.server.federation.FederationTestUtils.NAMENODES;
 import static org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster.DEFAULT_HEARTBEAT_INTERVAL_MS;
 import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_RPC_ASYNC_HANDLER_COUNT;
 import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_RPC_ASYNC_RESPONDER_COUNT;
 import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.syncReturn;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-public class TestRouterAsyncErasureCoding {
+public class TestRouterAsyncQuota {
   private static Configuration routerConf;
   /** Federated HDFS cluster. */
   private static MiniRouterDFSCluster cluster;
@@ -67,9 +59,9 @@ public class TestRouterAsyncErasureCoding {
   private MiniRouterDFSCluster.RouterContext router;
   private FileSystem routerFs;
   private RouterRpcServer routerRpcServer;
-  private AsyncErasureCoding asyncErasureCoding;
+  private AsyncQuota asyncQuota;
 
-  private final String testfilePath = "/testdir/testAsyncErasureCoding.file";
+  private final String testfilePath = "/testdir/testAsyncQuota.file";
 
   @BeforeClass
   public static void setUpCluster() throws Exception {
@@ -90,6 +82,7 @@ public class TestRouterAsyncErasureCoding {
     // Start routers with only an RPC service
     routerConf = new RouterConfigBuilder()
         .rpc()
+        .quota(true)
         .build();
 
     // Reduce the number of RPC clients threads to overload the Router easy
@@ -99,6 +92,7 @@ public class TestRouterAsyncErasureCoding {
     // We decrease the DN cache times to make the test faster
     routerConf.setTimeDuration(
         RBFConfigKeys.DN_REPORT_CACHE_EXPIRE, 1, TimeUnit.SECONDS);
+    routerConf.setBoolean(DFS_QUOTA_BY_STORAGETYPE_ENABLED_KEY, true);
     cluster.addRouterOverrides(routerConf);
     // Start routers with only an RPC service
     cluster.startRouters();
@@ -129,7 +123,7 @@ public class TestRouterAsyncErasureCoding {
         routerRpcServer.getRouterStateIdContext());
     RouterRpcServer spy = Mockito.spy(routerRpcServer);
     Mockito.when(spy.getRPCClient()).thenReturn(asyncRpcClient);
-    asyncErasureCoding = new AsyncErasureCoding(spy);
+    asyncQuota = new AsyncQuota(router.getRouter(), spy);
 
     // Create mock locations
     MockResolver resolver = (MockResolver) router.getRouter().getSubclusterResolver();
@@ -154,53 +148,21 @@ public class TestRouterAsyncErasureCoding {
   }
 
   @Test
-  public void testRouterAsyncErasureCoding() throws Exception {
-    String ecPolicyName = StripedFileTestUtil.getDefaultECPolicy().getName();
-    HdfsFileStatus fileInfo = cluster.getNamenodes().get(0).getClient().getFileInfo(testfilePath);
-    assertNotNull(fileInfo);
+  public void testRouterAsyncGetQuotaUsage() throws Exception {
+    asyncQuota.getQuotaUsage("/testdir");
+    QuotaUsage quotaUsage = syncReturn(QuotaUsage.class);
+    // 3-replication.
+    Assert.assertEquals(3 * 1024, quotaUsage.getSpaceConsumed());
+    // We have one directory and one file.
+    Assert.assertEquals(2, quotaUsage.getFileAndDirectoryCount());
+  }
 
-    asyncErasureCoding.setErasureCodingPolicy("/testdir", ecPolicyName);
-    syncReturn(null);
-
-    asyncErasureCoding.getErasureCodingPolicy("/testdir");
-    ErasureCodingPolicy ecPolicy = syncReturn(ErasureCodingPolicy.class);
-    assertEquals(StripedFileTestUtil.getDefaultECPolicy().getName(), ecPolicy.getName());
-
-    asyncErasureCoding.getErasureCodingPolicies();
-    ErasureCodingPolicyInfo[] erasureCodingPolicies = syncReturn(ErasureCodingPolicyInfo[].class);
-    int numECPolicies = erasureCodingPolicies.length;
-    ErasureCodingPolicyInfo[] erasureCodingPoliciesFromNameNode =
-        cluster.getNamenodes().get(0).getClient().getErasureCodingPolicies();
-
-    assertArrayEquals(erasureCodingPoliciesFromNameNode, erasureCodingPolicies);
-
-    asyncErasureCoding.getErasureCodingCodecs();
-    Map<String, String> erasureCodingCodecs = syncReturn(Map.class);
-    Map<String, String> erasureCodingCodecsFromNameNode =
-        cluster.getNamenodes().get(0).getClient().getErasureCodingCodecs();
-
-    assertEquals(erasureCodingCodecs, erasureCodingCodecsFromNameNode);
-
-    // RS-12-4-1024k
-    final ECSchema schema = new ECSchema("rs", 12, 4);
-    ErasureCodingPolicy erasureCodingPolicy = new ErasureCodingPolicy(schema, 1024 * 1024);
-    asyncErasureCoding.addErasureCodingPolicies(new ErasureCodingPolicy[]{erasureCodingPolicy});
-    AddErasureCodingPolicyResponse[] response = syncReturn(AddErasureCodingPolicyResponse[].class);
-    assertEquals(response[0].isSucceed(), true);
-
-    asyncErasureCoding.getErasureCodingPolicies();
-    ErasureCodingPolicyInfo[] erasureCodingPolicies2 = syncReturn(ErasureCodingPolicyInfo[].class);
-    int numNewECPolicies = erasureCodingPolicies2.length;
-    assertEquals(numECPolicies + 1, numNewECPolicies);
-
-    asyncErasureCoding.getECTopologyResultForPolicies(
-        new String[]{"RS-6-3-1024k", "RS-12-4-1024k"});
-    ECTopologyVerifierResult ecTResultForPolicies = syncReturn(ECTopologyVerifierResult.class);
-    assertEquals(false, ecTResultForPolicies.isSupported());
-
-    asyncErasureCoding.getECTopologyResultForPolicies(
-        new String[]{"XOR-2-1-1024k"});
-    ECTopologyVerifierResult ecTResultForPolicies2 = syncReturn(ECTopologyVerifierResult.class);
-    assertEquals(true, ecTResultForPolicies2.isSupported());
+  @Test
+  public void testRouterAsyncSetQuotaUsage() throws Exception {
+    asyncQuota.setQuota("/testdir", Long.MAX_VALUE, 8096, StorageType.DISK, false);
+    syncReturn(void.class);
+    asyncQuota.getQuotaUsage("/testdir");
+    QuotaUsage quotaUsage = syncReturn(QuotaUsage.class);
+    Assert.assertEquals(8096, quotaUsage.getTypeQuota(StorageType.DISK));
   }
 }

@@ -6,29 +6,34 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdfs.server.federation.router;
+package org.apache.hadoop.hdfs.server.federation.router.async;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
+import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
+import org.apache.hadoop.hdfs.protocol.SnapshotDiffReportListing;
+import org.apache.hadoop.hdfs.protocol.SnapshotException;
+import org.apache.hadoop.hdfs.protocol.SnapshotStatus;
+import org.apache.hadoop.hdfs.protocol.SnapshottableDirectoryStatus;
 import org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster;
 import org.apache.hadoop.hdfs.server.federation.MockResolver;
 import org.apache.hadoop.hdfs.server.federation.RouterConfigBuilder;
-import org.apache.hadoop.hdfs.server.federation.router.async.RouterAsyncRpcClient;
-import org.apache.hadoop.hdfs.server.federation.router.async.RouterAsyncStoragePolicy;
+import org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys;
+import org.apache.hadoop.hdfs.server.federation.router.RouterRpcServer;
 import org.apache.hadoop.ipc.CallerContext;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -39,17 +44,16 @@ import org.mockito.Mockito;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.MODIFY;
 import static org.apache.hadoop.hdfs.server.federation.FederationTestUtils.NAMENODES;
 import static org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster.DEFAULT_HEARTBEAT_INTERVAL_MS;
 import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_RPC_ASYNC_HANDLER_COUNT;
 import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_RPC_ASYNC_RESPONDER_COUNT;
 import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.syncReturn;
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
-public class TestRouterAsyncStoragePolicy {
+public class TestRouterAsyncSnapshot {
   private static Configuration routerConf;
   /** Federated HDFS cluster. */
   private static MiniRouterDFSCluster cluster;
@@ -59,9 +63,7 @@ public class TestRouterAsyncStoragePolicy {
   private MiniRouterDFSCluster.RouterContext router;
   private FileSystem routerFs;
   private RouterRpcServer routerRpcServer;
-  private RouterAsyncStoragePolicy asyncStoragePolicy;
-
-  private final String testfilePath = "/testdir/testAsyncStoragePolicy.file";
+  private RouterAsyncSnapshot asyncSnapshot;
 
   @BeforeClass
   public static void setUpCluster() throws Exception {
@@ -120,7 +122,7 @@ public class TestRouterAsyncStoragePolicy {
         routerRpcServer.getRouterStateIdContext());
     RouterRpcServer spy = Mockito.spy(routerRpcServer);
     Mockito.when(spy.getRPCClient()).thenReturn(asyncRpcClient);
-    asyncStoragePolicy = new RouterAsyncStoragePolicy(spy);
+    asyncSnapshot = new RouterAsyncSnapshot(spy);
 
     // Create mock locations
     MockResolver resolver = (MockResolver) router.getRouter().getSubclusterResolver();
@@ -128,7 +130,7 @@ public class TestRouterAsyncStoragePolicy {
     FsPermission permission = new FsPermission("705");
     routerFs.mkdirs(new Path("/testdir"), permission);
     FSDataOutputStream fsDataOutputStream = routerFs.create(
-        new Path(testfilePath), true);
+        new Path("/testdir/testSnapshot.file"), true);
     fsDataOutputStream.write(new byte[1024]);
     fsDataOutputStream.close();
   }
@@ -145,21 +147,63 @@ public class TestRouterAsyncStoragePolicy {
   }
 
   @Test
-  public void testRouterAsyncStoragePolicy() throws Exception {
-    BlockStoragePolicy[] storagePolicies = cluster.getNamenodes().get(0)
-        .getClient().getStoragePolicies();
-    asyncStoragePolicy.getStoragePolicies();
-    BlockStoragePolicy[] storagePoliciesAsync = syncReturn(BlockStoragePolicy[].class);
-    assertArrayEquals(storagePolicies, storagePoliciesAsync);
-
-    asyncStoragePolicy.getStoragePolicy(testfilePath);
-    BlockStoragePolicy blockStoragePolicy1 = syncReturn(BlockStoragePolicy.class);
-
-    asyncStoragePolicy.setStoragePolicy(testfilePath, "COLD");
+  public void testRouterAsyncSnapshot() throws Exception {
+    asyncSnapshot.allowSnapshot("/testdir");
     syncReturn(null);
-    asyncStoragePolicy.getStoragePolicy(testfilePath);
-    BlockStoragePolicy blockStoragePolicy2 = syncReturn(BlockStoragePolicy.class);
-    assertNotEquals(blockStoragePolicy1, blockStoragePolicy2);
-    assertEquals("COLD", blockStoragePolicy2.getName());
+    asyncSnapshot.createSnapshot("/testdir", "testdirSnapshot");
+    String snapshotName = syncReturn(String.class);
+    assertEquals("/testdir/.snapshot/testdirSnapshot", snapshotName);
+    asyncSnapshot.getSnapshottableDirListing();
+    SnapshottableDirectoryStatus[] snapshottableDirectoryStatuses =
+        syncReturn(SnapshottableDirectoryStatus[].class);
+    assertEquals(1, snapshottableDirectoryStatuses.length);
+    asyncSnapshot.getSnapshotListing("/testdir");
+    SnapshotStatus[] snapshotStatuses = syncReturn(SnapshotStatus[].class);
+    assertEquals(1, snapshotStatuses.length);
+
+    FSDataOutputStream fsDataOutputStream = routerFs.append(
+        new Path("/testdir/testSnapshot.file"), true);
+    fsDataOutputStream.write(new byte[1024]);
+    fsDataOutputStream.close();
+
+    asyncSnapshot.createSnapshot("/testdir", "testdirSnapshot1");
+    snapshotName = syncReturn(String.class);
+    assertEquals("/testdir/.snapshot/testdirSnapshot1", snapshotName);
+
+    asyncSnapshot.getSnapshotDiffReport("/testdir",
+        "testdirSnapshot", "testdirSnapshot1");
+    SnapshotDiffReport snapshotDiffReport = syncReturn(SnapshotDiffReport.class);
+    assertEquals(MODIFY, snapshotDiffReport.getDiffList().get(0).getType());
+
+    asyncSnapshot.getSnapshotDiffReportListing("/testdir",
+        "testdirSnapshot", "testdirSnapshot1", new byte[]{}, -1);
+    SnapshotDiffReportListing snapshotDiffReportListing =
+        syncReturn(SnapshotDiffReportListing.class);
+    assertEquals(1, snapshotDiffReportListing.getModifyList().size());
+
+    LambdaTestUtils.intercept(SnapshotException.class, () -> {
+      asyncSnapshot.disallowSnapshot("/testdir");
+      syncReturn(null);
+    });
+
+    asyncSnapshot.renameSnapshot("/testdir",
+        "testdirSnapshot1", "testdirSnapshot2");
+    syncReturn(null);
+
+    LambdaTestUtils.intercept(SnapshotException.class,
+        "Cannot delete snapshot testdirSnapshot1 from path /testdir",
+        () -> {
+        asyncSnapshot.deleteSnapshot("/testdir", "testdirSnapshot1");
+        syncReturn(null);
+      });
+
+    asyncSnapshot.deleteSnapshot("/testdir", "testdirSnapshot2");
+    syncReturn(null);
+
+    asyncSnapshot.deleteSnapshot("/testdir", "testdirSnapshot");
+    syncReturn(null);
+
+    asyncSnapshot.disallowSnapshot("/testdir");
+    syncReturn(null);
   }
 }

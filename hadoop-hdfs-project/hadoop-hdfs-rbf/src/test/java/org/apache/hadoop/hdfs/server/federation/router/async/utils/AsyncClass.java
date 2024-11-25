@@ -15,13 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdfs.server.federation.router.async;
+package org.apache.hadoop.hdfs.server.federation.router.async.utils;
 
-import org.apache.hadoop.hdfs.server.federation.router.async.utils.Async;
-import org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncApplyFunction;
-import org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncCatchFunction;
-import org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil;
-import org.apache.hadoop.hdfs.server.federation.router.async.utils.FinallyFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

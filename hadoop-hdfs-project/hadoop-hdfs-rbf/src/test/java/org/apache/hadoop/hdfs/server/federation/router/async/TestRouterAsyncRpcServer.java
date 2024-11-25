@@ -6,34 +6,33 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdfs.server.federation.router;
+package org.apache.hadoop.hdfs.server.federation.router.async;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
-import org.apache.hadoop.hdfs.protocol.SnapshotDiffReportListing;
-import org.apache.hadoop.hdfs.protocol.SnapshotException;
-import org.apache.hadoop.hdfs.protocol.SnapshotStatus;
-import org.apache.hadoop.hdfs.protocol.SnapshottableDirectoryStatus;
+import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster;
 import org.apache.hadoop.hdfs.server.federation.MockResolver;
 import org.apache.hadoop.hdfs.server.federation.RouterConfigBuilder;
-import org.apache.hadoop.hdfs.server.federation.router.async.RouterAsyncRpcClient;
-import org.apache.hadoop.hdfs.server.federation.router.async.RouterAsyncSnapshot;
+import org.apache.hadoop.hdfs.server.federation.resolver.RemoteLocation;
+import org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys;
+import org.apache.hadoop.hdfs.server.federation.router.RemoteMethod;
+import org.apache.hadoop.hdfs.server.federation.router.RouterRpcServer;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
 import org.apache.hadoop.ipc.CallerContext;
-import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -42,18 +41,23 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.MODIFY;
 import static org.apache.hadoop.hdfs.server.federation.FederationTestUtils.NAMENODES;
 import static org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster.DEFAULT_HEARTBEAT_INTERVAL_MS;
 import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_RPC_ASYNC_HANDLER_COUNT;
 import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_RPC_ASYNC_RESPONDER_COUNT;
 import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.syncReturn;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-public class TestRouterAsyncSnapshot {
+/**
+ * Used to test the async functionality of {@link RouterRpcServer}.
+ */
+public class TestRouterAsyncRpcServer {
   private static Configuration routerConf;
   /** Federated HDFS cluster. */
   private static MiniRouterDFSCluster cluster;
@@ -62,8 +66,7 @@ public class TestRouterAsyncSnapshot {
   /** Random Router for this federated cluster. */
   private MiniRouterDFSCluster.RouterContext router;
   private FileSystem routerFs;
-  private RouterRpcServer routerRpcServer;
-  private RouterAsyncSnapshot asyncSnapshot;
+  private RouterRpcServer asyncRouterRpcServer;
 
   @BeforeClass
   public static void setUpCluster() throws Exception {
@@ -114,25 +117,20 @@ public class TestRouterAsyncSnapshot {
   public void setUp() throws IOException {
     router = cluster.getRandomRouter();
     routerFs = router.getFileSystem();
-    routerRpcServer = router.getRouterRpcServer();
+    RouterRpcServer routerRpcServer = router.getRouterRpcServer();
     routerRpcServer.initAsyncThreadPool();
     RouterAsyncRpcClient asyncRpcClient = new RouterAsyncRpcClient(
         routerConf, router.getRouter(), routerRpcServer.getNamenodeResolver(),
         routerRpcServer.getRPCMonitor(),
         routerRpcServer.getRouterStateIdContext());
-    RouterRpcServer spy = Mockito.spy(routerRpcServer);
-    Mockito.when(spy.getRPCClient()).thenReturn(asyncRpcClient);
-    asyncSnapshot = new RouterAsyncSnapshot(spy);
+    asyncRouterRpcServer = Mockito.spy(routerRpcServer);
+    Mockito.when(asyncRouterRpcServer.getRPCClient()).thenReturn(asyncRpcClient);
 
     // Create mock locations
     MockResolver resolver = (MockResolver) router.getRouter().getSubclusterResolver();
     resolver.addLocation("/", ns0, "/");
     FsPermission permission = new FsPermission("705");
     routerFs.mkdirs(new Path("/testdir"), permission);
-    FSDataOutputStream fsDataOutputStream = routerFs.create(
-        new Path("/testdir/testSnapshot.file"), true);
-    fsDataOutputStream.write(new byte[1024]);
-    fsDataOutputStream.close();
   }
 
   @After
@@ -146,64 +144,51 @@ public class TestRouterAsyncSnapshot {
     }
   }
 
+  /**
+   * Test that the async RPC server can invoke a method at an available Namenode.
+   */
   @Test
-  public void testRouterAsyncSnapshot() throws Exception {
-    asyncSnapshot.allowSnapshot("/testdir");
-    syncReturn(null);
-    asyncSnapshot.createSnapshot("/testdir", "testdirSnapshot");
-    String snapshotName = syncReturn(String.class);
-    assertEquals("/testdir/.snapshot/testdirSnapshot", snapshotName);
-    asyncSnapshot.getSnapshottableDirListing();
-    SnapshottableDirectoryStatus[] snapshottableDirectoryStatuses =
-        syncReturn(SnapshottableDirectoryStatus[].class);
-    assertEquals(1, snapshottableDirectoryStatuses.length);
-    asyncSnapshot.getSnapshotListing("/testdir");
-    SnapshotStatus[] snapshotStatuses = syncReturn(SnapshotStatus[].class);
-    assertEquals(1, snapshotStatuses.length);
+  public void testInvokeAtAvailableNsAsync() throws Exception {
+    RemoteMethod method = new RemoteMethod("getStoragePolicies");
+    asyncRouterRpcServer.invokeAtAvailableNsAsync(method, BlockStoragePolicy[].class);
+    BlockStoragePolicy[] storagePolicies = syncReturn(BlockStoragePolicy[].class);
+    assertEquals(8, storagePolicies.length);
+  }
 
-    FSDataOutputStream fsDataOutputStream = routerFs.append(
-        new Path("/testdir/testSnapshot.file"), true);
-    fsDataOutputStream.write(new byte[1024]);
-    fsDataOutputStream.close();
+  /**
+   * Test get create location async.
+   */
+  @Test
+  public void testGetCreateLocationAsync() throws Exception {
+    final List<RemoteLocation> locations =
+        asyncRouterRpcServer.getLocationsForPath("/testdir", true);
+    asyncRouterRpcServer.getCreateLocationAsync("/testdir", locations);
+    RemoteLocation remoteLocation = syncReturn(RemoteLocation.class);
+    assertNotNull(remoteLocation);
+    assertEquals(ns0, remoteLocation.getNameserviceId());
+  }
 
-    asyncSnapshot.createSnapshot("/testdir", "testdirSnapshot1");
-    snapshotName = syncReturn(String.class);
-    assertEquals("/testdir/.snapshot/testdirSnapshot1", snapshotName);
+  /**
+   * Test get datanode report async.
+   */
+  @Test
+  public void testGetDatanodeReportAsync() throws Exception {
+    asyncRouterRpcServer.getDatanodeReportAsync(
+        HdfsConstants.DatanodeReportType.ALL, true, 0);
+    DatanodeInfo[] datanodeInfos = syncReturn(DatanodeInfo[].class);
+    assertEquals(3, datanodeInfos.length);
 
-    asyncSnapshot.getSnapshotDiffReport("/testdir",
-        "testdirSnapshot", "testdirSnapshot1");
-    SnapshotDiffReport snapshotDiffReport = syncReturn(SnapshotDiffReport.class);
-    assertEquals(MODIFY, snapshotDiffReport.getDiffList().get(0).getType());
+    // Get the namespace where the datanode is located
+    asyncRouterRpcServer.getDatanodeStorageReportMapAsync(HdfsConstants.DatanodeReportType.ALL);
+    Map<String, DatanodeStorageReport[]> map = syncReturn(Map.class);
+    assertEquals(1, map.size());
+    assertEquals(3, map.get(ns0).length);
 
-    asyncSnapshot.getSnapshotDiffReportListing("/testdir",
-        "testdirSnapshot", "testdirSnapshot1", new byte[]{}, -1);
-    SnapshotDiffReportListing snapshotDiffReportListing =
-        syncReturn(SnapshotDiffReportListing.class);
-    assertEquals(1, snapshotDiffReportListing.getModifyList().size());
+    DatanodeInfo[] slowDatanodeReport1 =
+        asyncRouterRpcServer.getSlowDatanodeReport(true, 0);
 
-    LambdaTestUtils.intercept(SnapshotException.class, () -> {
-      asyncSnapshot.disallowSnapshot("/testdir");
-      syncReturn(null);
-    });
-
-    asyncSnapshot.renameSnapshot("/testdir",
-        "testdirSnapshot1", "testdirSnapshot2");
-    syncReturn(null);
-
-    LambdaTestUtils.intercept(SnapshotException.class,
-        "Cannot delete snapshot testdirSnapshot1 from path /testdir",
-        () -> {
-        asyncSnapshot.deleteSnapshot("/testdir", "testdirSnapshot1");
-        syncReturn(null);
-      });
-
-    asyncSnapshot.deleteSnapshot("/testdir", "testdirSnapshot2");
-    syncReturn(null);
-
-    asyncSnapshot.deleteSnapshot("/testdir", "testdirSnapshot");
-    syncReturn(null);
-
-    asyncSnapshot.disallowSnapshot("/testdir");
-    syncReturn(null);
+    asyncRouterRpcServer.getSlowDatanodeReportAsync(true, 0);
+    DatanodeInfo[] slowDatanodeReport2 = syncReturn(DatanodeInfo[].class);
+    assertEquals(slowDatanodeReport1, slowDatanodeReport2);
   }
 }

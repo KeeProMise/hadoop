@@ -1033,7 +1033,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
    * @return The remote location for this file.
    * @throws IOException If the file has no creation location.
    */
-  RemoteLocation getCreateLocationAsync(
+  public RemoteLocation getCreateLocationAsync(
       final String src, final List<RemoteLocation> locations)
       throws IOException {
 
@@ -1996,7 +1996,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol,
    * @return Prioritized list of locations in the federated cluster.
    * @throws IOException If the location for this path cannot be determined.
    */
-  protected List<RemoteLocation> getLocationsForPath(String path,
+  public List<RemoteLocation> getLocationsForPath(String path,
       boolean failIfLocked) throws IOException {
     return getLocationsForPath(path, failIfLocked, true);
   }

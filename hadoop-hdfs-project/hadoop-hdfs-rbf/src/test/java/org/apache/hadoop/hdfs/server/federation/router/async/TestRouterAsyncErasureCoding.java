@@ -15,24 +15,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.hdfs.server.federation.router.async;
 
-package org.apache.hadoop.hdfs.server.federation.router;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CacheFlag;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
-import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
-import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
-import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdfs.StripedFileTestUtil;
+import org.apache.hadoop.hdfs.protocol.AddErasureCodingPolicyResponse;
+import org.apache.hadoop.hdfs.protocol.ECTopologyVerifierResult;
+import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicy;
+import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicyInfo;
+import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster;
 import org.apache.hadoop.hdfs.server.federation.MockResolver;
 import org.apache.hadoop.hdfs.server.federation.RouterConfigBuilder;
-import org.apache.hadoop.fs.BatchedRemoteIterator.BatchedEntries;
-import org.apache.hadoop.hdfs.server.federation.router.async.RouterAsyncCacheAdmin;
-import org.apache.hadoop.hdfs.server.federation.router.async.RouterAsyncRpcClient;
+import org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys;
+import org.apache.hadoop.hdfs.server.federation.router.RouterRpcServer;
+import org.apache.hadoop.io.erasurecode.ECSchema;
 import org.apache.hadoop.ipc.CallerContext;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -42,7 +44,7 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
-import java.util.EnumSet;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdfs.server.federation.FederationTestUtils.NAMENODES;
@@ -50,10 +52,12 @@ import static org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster.DEFA
 import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_RPC_ASYNC_HANDLER_COUNT;
 import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_RPC_ASYNC_RESPONDER_COUNT;
 import static org.apache.hadoop.hdfs.server.federation.router.async.utils.AsyncUtil.syncReturn;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-public class TestRouterAsyncCacheAdmin {
+public class TestRouterAsyncErasureCoding {
   private static Configuration routerConf;
   /** Federated HDFS cluster. */
   private static MiniRouterDFSCluster cluster;
@@ -63,14 +67,17 @@ public class TestRouterAsyncCacheAdmin {
   private MiniRouterDFSCluster.RouterContext router;
   private FileSystem routerFs;
   private RouterRpcServer routerRpcServer;
-  private RouterAsyncCacheAdmin asyncCacheAdmin;
+  private AsyncErasureCoding asyncErasureCoding;
+
+  private final String testfilePath = "/testdir/testAsyncErasureCoding.file";
 
   @BeforeClass
   public static void setUpCluster() throws Exception {
     cluster = new MiniRouterDFSCluster(true, 1, 2,
         DEFAULT_HEARTBEAT_INTERVAL_MS, 1000);
     cluster.setNumDatanodesPerNameservice(3);
-
+    cluster.setRacks(
+        new String[] {"/rack1", "/rack2", "/rack3"});
     cluster.startCluster();
 
     // Making one Namenode active per nameservice
@@ -122,13 +129,15 @@ public class TestRouterAsyncCacheAdmin {
         routerRpcServer.getRouterStateIdContext());
     RouterRpcServer spy = Mockito.spy(routerRpcServer);
     Mockito.when(spy.getRPCClient()).thenReturn(asyncRpcClient);
-    asyncCacheAdmin = new RouterAsyncCacheAdmin(spy);
+    asyncErasureCoding = new AsyncErasureCoding(spy);
 
     // Create mock locations
     MockResolver resolver = (MockResolver) router.getRouter().getSubclusterResolver();
     resolver.addLocation("/", ns0, "/");
+    FsPermission permission = new FsPermission("705");
+    routerFs.mkdirs(new Path("/testdir"), permission);
     FSDataOutputStream fsDataOutputStream = routerFs.create(
-        new Path("/testCache.file"), true);
+        new Path(testfilePath), true);
     fsDataOutputStream.write(new byte[1024]);
     fsDataOutputStream.close();
   }
@@ -137,7 +146,7 @@ public class TestRouterAsyncCacheAdmin {
   public void tearDown() throws IOException {
     // clear client context
     CallerContext.setCurrent(null);
-    boolean delete = routerFs.delete(new Path("/testCache.file"));
+    boolean delete = routerFs.delete(new Path("/testdir"));
     assertTrue(delete);
     if (routerFs != null) {
       routerFs.close();
@@ -145,53 +154,53 @@ public class TestRouterAsyncCacheAdmin {
   }
 
   @Test
-  public void testRouterAsyncCacheAdmin() throws Exception {
-    asyncCacheAdmin.addCachePool(new CachePoolInfo("pool"));
+  public void testRouterAsyncErasureCoding() throws Exception {
+    String ecPolicyName = StripedFileTestUtil.getDefaultECPolicy().getName();
+    HdfsFileStatus fileInfo = cluster.getNamenodes().get(0).getClient().getFileInfo(testfilePath);
+    assertNotNull(fileInfo);
+
+    asyncErasureCoding.setErasureCodingPolicy("/testdir", ecPolicyName);
     syncReturn(null);
 
-    CacheDirectiveInfo path = new CacheDirectiveInfo.Builder().
-        setPool("pool").
-        setPath(new Path("/testCache.file")).
-        build();
-    asyncCacheAdmin.addCacheDirective(path, EnumSet.of(CacheFlag.FORCE));
-    long result = syncReturn(long.class);
-    assertEquals(1, result);
+    asyncErasureCoding.getErasureCodingPolicy("/testdir");
+    ErasureCodingPolicy ecPolicy = syncReturn(ErasureCodingPolicy.class);
+    assertEquals(StripedFileTestUtil.getDefaultECPolicy().getName(), ecPolicy.getName());
 
-    asyncCacheAdmin.listCachePools("");
-    BatchedEntries<CachePoolEntry> cachePoolEntries = syncReturn(BatchedEntries.class);
-    assertEquals("pool", cachePoolEntries.get(0).getInfo().getPoolName());
+    asyncErasureCoding.getErasureCodingPolicies();
+    ErasureCodingPolicyInfo[] erasureCodingPolicies = syncReturn(ErasureCodingPolicyInfo[].class);
+    int numECPolicies = erasureCodingPolicies.length;
+    ErasureCodingPolicyInfo[] erasureCodingPoliciesFromNameNode =
+        cluster.getNamenodes().get(0).getClient().getErasureCodingPolicies();
 
-    CacheDirectiveInfo filter = new CacheDirectiveInfo.Builder().
-        setPool("pool").
-        build();
-    asyncCacheAdmin.listCacheDirectives(0, filter);
-    BatchedEntries<CacheDirectiveEntry> cacheDirectiveEntries = syncReturn(BatchedEntries.class);
-    assertEquals(new Path("/testCache.file"), cacheDirectiveEntries.get(0).getInfo().getPath());
+    assertArrayEquals(erasureCodingPoliciesFromNameNode, erasureCodingPolicies);
 
-    CachePoolInfo pool = new CachePoolInfo("pool").setOwnerName("pool_user");
-    asyncCacheAdmin.modifyCachePool(pool);
-    syncReturn(null);
+    asyncErasureCoding.getErasureCodingCodecs();
+    Map<String, String> erasureCodingCodecs = syncReturn(Map.class);
+    Map<String, String> erasureCodingCodecsFromNameNode =
+        cluster.getNamenodes().get(0).getClient().getErasureCodingCodecs();
 
-    asyncCacheAdmin.listCachePools("");
-    cachePoolEntries = syncReturn(BatchedEntries.class);
-    assertEquals("pool_user", cachePoolEntries.get(0).getInfo().getOwnerName());
+    assertEquals(erasureCodingCodecs, erasureCodingCodecsFromNameNode);
 
-    path = new CacheDirectiveInfo.Builder().
-        setPool("pool").
-        setPath(new Path("/testCache.file")).
-        setReplication((short) 2).
-        setId(1L).
-        build();
-    asyncCacheAdmin.modifyCacheDirective(path, EnumSet.of(CacheFlag.FORCE));
-    syncReturn(null);
+    // RS-12-4-1024k
+    final ECSchema schema = new ECSchema("rs", 12, 4);
+    ErasureCodingPolicy erasureCodingPolicy = new ErasureCodingPolicy(schema, 1024 * 1024);
+    asyncErasureCoding.addErasureCodingPolicies(new ErasureCodingPolicy[]{erasureCodingPolicy});
+    AddErasureCodingPolicyResponse[] response = syncReturn(AddErasureCodingPolicyResponse[].class);
+    assertEquals(response[0].isSucceed(), true);
 
-    asyncCacheAdmin.listCacheDirectives(0, filter);
-    cacheDirectiveEntries = syncReturn(BatchedEntries.class);
-    assertEquals(Short.valueOf((short) 2), cacheDirectiveEntries.get(0).getInfo().getReplication());
+    asyncErasureCoding.getErasureCodingPolicies();
+    ErasureCodingPolicyInfo[] erasureCodingPolicies2 = syncReturn(ErasureCodingPolicyInfo[].class);
+    int numNewECPolicies = erasureCodingPolicies2.length;
+    assertEquals(numECPolicies + 1, numNewECPolicies);
 
-    asyncCacheAdmin.removeCacheDirective(1L);
-    syncReturn(null);
-    asyncCacheAdmin.removeCachePool("pool");
-    syncReturn(null);
+    asyncErasureCoding.getECTopologyResultForPolicies(
+        new String[]{"RS-6-3-1024k", "RS-12-4-1024k"});
+    ECTopologyVerifierResult ecTResultForPolicies = syncReturn(ECTopologyVerifierResult.class);
+    assertEquals(false, ecTResultForPolicies.isSupported());
+
+    asyncErasureCoding.getECTopologyResultForPolicies(
+        new String[]{"XOR-2-1-1024k"});
+    ECTopologyVerifierResult ecTResultForPolicies2 = syncReturn(ECTopologyVerifierResult.class);
+    assertEquals(true, ecTResultForPolicies2.isSupported());
   }
 }

@@ -15,9 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdfs.server.federation.async;
+package org.apache.hadoop.hdfs.server.federation.router.async;
 
-import org.apache.hadoop.hdfs.server.federation.router.async.RouterAsyncUserProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Before;
 import org.junit.Test;
