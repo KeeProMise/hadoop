@@ -65,6 +65,10 @@ public class RouterAsyncUserProtocol extends RouterUserProtocol {
     this.namenodeResolver = this.rpcServer.getNamenodeResolver();
   }
 
+  /**
+   * Asynchronously refresh user to group mappings.
+   * @throws IOException  raised on errors performing I/O.
+   */
   @Override
   public void refreshUserToGroupsMappings() throws IOException {
     LOG.debug("Refresh user groups mapping in Router.");
@@ -80,6 +84,10 @@ public class RouterAsyncUserProtocol extends RouterUserProtocol {
     }
   }
 
+  /**
+   * Asynchronously refresh superuser proxy group list.
+   * @throws IOException  raised on errors performing I/O.
+   */
   @Override
   public void refreshSuperUserGroupsConfiguration() throws IOException {
     LOG.debug("Refresh superuser groups configuration in Router.");
@@ -95,6 +103,12 @@ public class RouterAsyncUserProtocol extends RouterUserProtocol {
     }
   }
 
+  /**
+   * Asynchronously get the groups which are mapped to the given user.
+   * @param user The user to get the groups for.
+   * @return The set of groups the user belongs to.
+   * @throws IOException raised on errors performing I/O.
+   */
   @Override
   public String[] getGroupsForUser(String user) throws IOException {
     LOG.debug("Getting groups for user {}", user);

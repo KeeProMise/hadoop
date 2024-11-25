@@ -56,6 +56,21 @@ public class RouterAsyncNamenodeProtocol extends RouterNamenodeProtocol {
     this.rpcClient =  this.rpcServer.getRPCClient();
   }
 
+  /**
+   * Asynchronously get a list of blocks belonging to <code>datanode</code>
+   * whose total size equals <code>size</code>.
+   *
+   * @see org.apache.hadoop.hdfs.server.balancer.Balancer
+   * @param datanode  a data node
+   * @param size      requested size
+   * @param minBlockSize each block should be of this minimum Block Size
+   * @param hotBlockTimeInterval prefer to get blocks which are belong to
+   * the cold files accessed before the time interval
+   * @param storageType the given storage type {@link StorageType}
+   * @return BlocksWithLocations a list of blocks &amp; their locations
+   * @throws IOException if size is less than or equal to 0 or
+  datanode does not exist
+   */
   @Override
   public BlocksWithLocations getBlocks(
       DatanodeInfo datanode, long size,
@@ -94,6 +109,12 @@ public class RouterAsyncNamenodeProtocol extends RouterNamenodeProtocol {
     return asyncReturn(BlocksWithLocations.class);
   }
 
+  /**
+   * Asynchronously get the current block keys.
+   *
+   * @return ExportedBlockKeys containing current block keys
+   * @throws IOException if there is no namespace available or other ioExceptions.
+   */
   @Override
   public ExportedBlockKeys getBlockKeys() throws IOException {
     rpcServer.checkOperation(NameNode.OperationCategory.READ);
@@ -104,6 +125,14 @@ public class RouterAsyncNamenodeProtocol extends RouterNamenodeProtocol {
     return asyncReturn(ExportedBlockKeys.class);
   }
 
+  /**
+   * Asynchronously get the most recent transaction ID.
+   *
+   * @return The most recent transaction ID that has been synced to
+   * persistent storage, or applied from persistent storage in the
+   * case of a non-active node.
+   * @throws IOException if there is no namespace available or other ioExceptions.
+   */
   @Override
   public long getTransactionID() throws IOException {
     rpcServer.checkOperation(NameNode.OperationCategory.READ);
@@ -114,6 +143,12 @@ public class RouterAsyncNamenodeProtocol extends RouterNamenodeProtocol {
     return asyncReturn(Long.class);
   }
 
+  /**
+   * Asynchronously get the transaction ID of the most recent checkpoint.
+   *
+   * @return The transaction ID of the most recent checkpoint.
+   * @throws IOException if there is no namespace available or other ioExceptions.
+   */
   @Override
   public long getMostRecentCheckpointTxId() throws IOException {
     rpcServer.checkOperation(NameNode.OperationCategory.READ);
@@ -124,6 +159,14 @@ public class RouterAsyncNamenodeProtocol extends RouterNamenodeProtocol {
     return asyncReturn(Long.class);
   }
 
+  /**
+   * Asynchronously get the transaction ID of the most recent checkpoint
+   * for the given NameNodeFile.
+   *
+   * @return The transaction ID of the most recent checkpoint
+   * for the given NameNodeFile.
+   * @throws IOException if there is no namespace available or other ioExceptions.
+   */
   @Override
   public long getMostRecentNameNodeFileTxId(NNStorage.NameNodeFile nnf)
       throws IOException {
@@ -136,6 +179,13 @@ public class RouterAsyncNamenodeProtocol extends RouterNamenodeProtocol {
     return asyncReturn(Long.class);
   }
 
+  /**
+   * Asynchronously request name-node version and storage information.
+   *
+   * @return {@link NamespaceInfo} identifying versions and storage information
+   *          of the name-node.
+   * @throws IOException if there is no namespace available or other ioExceptions.
+   */
   @Override
   public NamespaceInfo versionRequest() throws IOException {
     rpcServer.checkOperation(NameNode.OperationCategory.READ);
