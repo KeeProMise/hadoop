@@ -572,7 +572,7 @@ See the Apache JIRA ticket [HDFS-17531](https://issues.apache.org/jira/browse/HD
 it directly places the response into the response queue. Otherwise, it forwards the ```RpcCall``` to the **Async-Handler**.
 - **Async-Handler**: Puts the ```RpcCall``` into the ```connection.calls``` of the connection thread and returns immediately without blocking and waiting.
 - **Async-Responder**: Is responsible for processing the response received by the connection thread. If the ```RpcCall``` needs to be retried (such as the downstream service returns a ```StandbyException```),
-it re-adds the ```RpcCall``` to the **Async-Handler**; otherwise, it puts the response into the ```ResponseQueue```.
+it re-adds the ```RpcCall``` to the ```connection.calls```; otherwise, it puts the response into the ```ResponseQueue```.
 - **Responder**: Retrieves the response from the ```ResponseQueue``` and returns it to the client.
 
 ### Advantages of the Asynchronous Router Rpc
