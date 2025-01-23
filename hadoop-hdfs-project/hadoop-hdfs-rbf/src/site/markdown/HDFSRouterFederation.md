@@ -584,10 +584,9 @@ This not only significantly enhances the system's concurrent processing capacity
 it will not impact the processing capabilities of other name-services, ensuring the stability and reliability of the entire system.
 
 ### Asynchronous Router Rpc configuration
-
-| Property                                         | Default | Description                                                                                                                                                                                                              |
-|:-------------------------------------------------|:--------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| dfs.federation.router.async.rpc.enable           | false | If true, router will process the ```RpcCall``` asynchronously. |
+| Property | Default | Description|
+|:---- |:---- |:---- |
+| dfs.federation.router.async.rpc.enable | false | If true, router will process the ```RpcCall``` asynchronously. |
 | dfs.federation.router.async.rpc.ns.handler.count |  | The number of async-handlers per nameservice, separated by commas, internally separated by colons.  The identifier of nameservice is in dfs.nameservices configuration entry. Such as: ns1:count1,ns2:count2,ns3:count3. |
 | dfs.federation.router.async.rpc.handler.count | 10 | For those nameservices not in dfs.federation.router.async.rpc.ns.handler.count configuration entry, use this value as the async-handler counts. |
-| dfs.federation.router.async.rpc.responder.count  | 10 | The thread counts of async-responders. |
+| dfs.federation.router.async.rpc.responder.count | 10 | The thread counts of async-responders. |
