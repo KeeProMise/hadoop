@@ -568,19 +568,19 @@ See the Apache JIRA ticket [HDFS-17531](https://issues.apache.org/jira/browse/HD
 
 ### Asynchronous router RPC threads
 
-- Handler: Retrieves ```RpcCall``` from the ```CallQueue``` for preliminary processing. In case of exceptions (such as the non-existence of the mount point),
+- **Handler**: Retrieves ```RpcCall``` from the ```CallQueue``` for preliminary processing. In case of exceptions (such as the non-existence of the mount point),
 it directly places the response into the response queue. Otherwise, it forwards the ```RpcCall``` to the **Async-Handler**.
-- Async-Handler: Puts the ```RpcCall``` into the ```connection.calls``` of the connection thread and returns immediately without blocking and waiting.
-- Async-Responder: Is responsible for processing the response received by the connection thread. If the ```RpcCall``` needs to be retried (such as the downstream service returns a ```StandbyException```),
+- **Async-Handler**: Puts the ```RpcCall``` into the ```connection.calls``` of the connection thread and returns immediately without blocking and waiting.
+- **Async-Responder**: Is responsible for processing the response received by the connection thread. If the ```RpcCall``` needs to be retried (such as the downstream service returns a ```StandbyException```),
 it re-adds the ```RpcCall``` to the **Async-Handler**; otherwise, it puts the response into the ```ResponseQueue```.
-- Responder: Retrieves the response from the ```ResponseQueue``` and returns it to the client.
+- **Responder**: Retrieves the response from the ```ResponseQueue``` and returns it to the client.
 
 ### Advantages of the Asynchronous Router Rpc
 
-- High Processing Performance: Benefiting from the asynchronous RPC (Remote Procedure Call) processing mechanism, the asynchronous router is capable of handling a large number of requests simultaneously.
+- **High Processing Performance**: Benefiting from the asynchronous RPC (Remote Procedure Call) processing mechanism, the asynchronous router is capable of handling a large number of requests simultaneously.
 This not only significantly enhances the system's concurrent processing capacity but also optimizes the overall throughput. This mechanism enables the system to respond rapidly to high - traffic requests and maintain efficient operation even under high - load conditions.
-- High Resource Utilization: The asynchronous design effectively reduces thread blocking and frequent thread switching. As a result, it minimizes the resource waste associated with threads, thereby improving the overall efficiency of the system and reducing CPU idle time.
-- High Isolation: Different name-services employ distinct asynchronous processor thread pools. This architecture achieves isolation among name-services. If a particular name-service experiences a performance degradation,
+- **High Resource Utilization**: The asynchronous design effectively reduces thread blocking and frequent thread switching. As a result, it minimizes the resource waste associated with threads, thereby improving the overall efficiency of the system and reducing CPU idle time.
+- **Isolation**: Different name-services employ distinct asynchronous processor thread pools. This architecture achieves isolation among name-services. If a particular name-service experiences a performance degradation,
 it will not impact the processing capabilities of other name-services, ensuring the stability and reliability of the entire system.
 
 ### Asynchronous Router Rpc configuration
